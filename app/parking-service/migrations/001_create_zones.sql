@@ -1,0 +1,16 @@
+CREATE TABLE IF NOT EXISTS zones (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS parking_spots (
+    id BIGSERIAL PRIMARY KEY,
+    zone_id BIGINT NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+    number VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'FREE',
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_parking_spots_zone_number UNIQUE (zone_id, number)
+);
