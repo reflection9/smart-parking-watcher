@@ -1,0 +1,74 @@
+{
+  "info": {
+    "_postman_id": "3fa0f857-26c1-41bd-a0aa-9196d1c1e24e",
+    "name": "event-service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create event",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"zone_id\": 1,\n  \"spot_id\": 1,\n  \"event_type\": \"SPOT_STATUS_CHANGED\",\n  \"old_status\": \"OCCUPIED\",\n  \"new_status\": \"FREE\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events"
+          ]
+        }
+      }
+    },
+    {
+      "name": "List events by zone",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/events/zones/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "zones",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "List events by spot",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/events/spots/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "spots",
+            "1"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8084"
+    }
+  ]
+}
