@@ -24,6 +24,7 @@ func main() {
 
 	router.POST("/subscriptions", subscriptionHandler.Create)
 	router.GET("/subscriptions/users/:userId", subscriptionHandler.ListByUserID)
+	router.GET("/subscriptions/zones/:zoneId", subscriptionHandler.ListByZoneID)
 	router.DELETE("/subscriptions/users/:userId/zones/:zoneId", subscriptionHandler.Delete)
 
 	log.Println("subscription-service started on port", cfg.AppPort)

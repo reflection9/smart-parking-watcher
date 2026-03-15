@@ -93,6 +93,25 @@ func (s *subscriptionService) ListByUserID(ctx context.Context, userID int64) ([
 	return response, nil
 }
 
+func (s *subscriptionService) ListByZoneID(ctx context.Context, zoneID int64) ([]dto.SubscriptionResponse, error) {
+	subscriptions, err := s.subscriptionRepo.ListByZoneID(ctx, zoneID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := make([]dto.SubscriptionResponse, 0, len(subscriptions))
+	for _, subscription := range subscriptions {
+		response = append(response, dto.SubscriptionResponse{
+			ID:        subscription.ID,
+			UserID:    subscription.UserID,
+			ZoneID:    subscription.ZoneID,
+			CreatedAt: subscription.CreatedAt,
+		})
+	}
+
+	return response, nil
+}
+
 func (s *subscriptionService) Delete(ctx context.Context, userID, zoneID int64) error {
 	err := s.subscriptionRepo.DeleteByUserAndZone(ctx, userID, zoneID)
 	if err != nil {

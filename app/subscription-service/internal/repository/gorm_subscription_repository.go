@@ -52,6 +52,21 @@ func (r *GormSubscriptionRepository) ListByUserID(ctx context.Context, userID in
 	return subscriptions, nil
 }
 
+func (r *GormSubscriptionRepository) ListByZoneID(ctx context.Context, zoneID int64) ([]model.Subscription, error) {
+	var subscriptions []model.Subscription
+
+	err := r.db.WithContext(ctx).
+		Where("zone_id = ?", zoneID).
+		Order("created_at DESC").
+		Find(&subscriptions).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return subscriptions, nil
+}
+
 func (r *GormSubscriptionRepository) DeleteByUserAndZone(ctx context.Context, userID, zoneID int64) error {
 	result := r.db.WithContext(ctx).
 		Where("user_id = ? AND zone_id = ?", userID, zoneID).
