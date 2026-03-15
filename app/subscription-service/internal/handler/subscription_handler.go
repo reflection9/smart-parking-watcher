@@ -68,6 +68,22 @@ func (h *SubscriptionHandler) ListByUserID(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+func (h *SubscriptionHandler) ListByZoneID(c *gin.Context) {
+	zoneID, err := strconv.ParseInt(c.Param("zoneId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid zone id"})
+		return
+	}
+
+	response, err := h.subscriptionService.ListByZoneID(c.Request.Context(), zoneID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get subscriptions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 func (h *SubscriptionHandler) Delete(c *gin.Context) {
 	userID, err := strconv.ParseInt(c.Param("userId"), 10, 64)
 	if err != nil {

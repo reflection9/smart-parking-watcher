@@ -6,6 +6,7 @@ Minimal service for user subscriptions to parking zones.
 
 - `POST /subscriptions`
 - `GET /subscriptions/users/:userId`
+- `GET /subscriptions/zones/:zoneId`
 - `DELETE /subscriptions/users/:userId/zones/:zoneId`
 
 ## Notes
