@@ -1,3 +1,35 @@
-.idea
+# IDE
+.idea/
+.vscode/
+*.iml
+out/
 
+# Environment
 .env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Go build
+bin/
+build/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Logs
+*.log
+
+# Coverage
+coverage.out
+*.coverprofile
+
+# Temp
+tmp/
+temp/
