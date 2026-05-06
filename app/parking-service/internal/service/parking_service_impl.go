@@ -107,6 +107,27 @@ func (s *parkingService) AddSpot(ctx context.Context, zoneID int64, req dto.AddS
 	return &response, nil
 }
 
+func (s *parkingService) GetSpotByID(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error) {
+	_, err := s.parkingRepo.GetZoneByID(ctx, zoneID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrZoneNotFound
+		}
+		return nil, err
+	}
+
+	spot, err := s.parkingRepo.GetSpotByIDAndZoneID(ctx, spotID, zoneID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrSpotNotFound
+		}
+		return nil, err
+	}
+
+	response := toSpotResponse(*spot)
+	return &response, nil
+}
+
 func (s *parkingService) UpdateSpotStatus(ctx context.Context, zoneID, spotID int64, req dto.UpdateSpotStatusRequest) (*dto.ParkingSpotResponse, error) {
 	if !model.IsValidSpotStatus(req.Status) {
 		return nil, ErrInvalidSpotStatus
@@ -134,6 +155,57 @@ func (s *parkingService) UpdateSpotStatus(ctx context.Context, zoneID, spotID in
 	if err := s.parkingRepo.UpdateSpot(ctx, spot); err != nil {
 		return nil, err
 	}
+
+	response := toSpotResponse(*spot)
+	return &response, nil
+}
+
+func (s *parkingService) ReserveSpot(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error) {
+	return s.transitionSpotStatus(ctx, zoneID, spotID, []model.SpotStatus{model.SpotStatusFree}, model.SpotStatusReserved, ErrSpotNotAvailable)
+}
+
+func (s *parkingService) ReleaseSpot(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error) {
+	return s.transitionSpotStatus(ctx, zoneID, spotID, []model.SpotStatus{model.SpotStatusReserved}, model.SpotStatusFree, ErrSpotNotReserved)
+}
+
+func (s *parkingService) OccupySpot(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error) {
+	return s.transitionSpotStatus(ctx, zoneID, spotID, []model.SpotStatus{model.SpotStatusReserved}, model.SpotStatusOccupied, ErrSpotNotReserved)
+}
+
+func (s *parkingService) transitionSpotStatus(
+	ctx context.Context,
+	zoneID, spotID int64,
+	current []model.SpotStatus,
+	next model.SpotStatus,
+	conflictErr error,
+) (*dto.ParkingSpotResponse, error) {
+	_, err := s.parkingRepo.GetZoneByID(ctx, zoneID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrZoneNotFound
+		}
+		return nil, err
+	}
+
+	spot, err := s.parkingRepo.GetSpotByIDAndZoneID(ctx, spotID, zoneID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrSpotNotFound
+		}
+		return nil, err
+	}
+
+	now := time.Now()
+	updated, err := s.parkingRepo.UpdateSpotStatusIfCurrent(ctx, spotID, zoneID, current, next, now)
+	if err != nil {
+		return nil, err
+	}
+	if !updated {
+		return nil, conflictErr
+	}
+
+	spot.Status = next
+	spot.UpdatedAt = now
 
 	response := toSpotResponse(*spot)
 	return &response, nil

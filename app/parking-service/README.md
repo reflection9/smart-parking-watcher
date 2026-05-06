@@ -8,5 +8,9 @@ Minimal parking management service.
 - `GET /zones`
 - `GET /zones/:id`
 - `POST /zones/:zoneId/spots`
+- `GET /zones/:zoneId/spots/:spotId`
 - `PATCH /zones/:zoneId/spots/:spotId/status`
+- `POST /zones/:zoneId/spots/:spotId/reserve`
+- `POST /zones/:zoneId/spots/:spotId/release`
+- `POST /zones/:zoneId/spots/:spotId/occupy`
 

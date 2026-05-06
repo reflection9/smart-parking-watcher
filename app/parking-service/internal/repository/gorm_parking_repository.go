@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"parking-service/internal/model"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -113,4 +114,26 @@ func (r *GormParkingRepository) GetSpotByIDAndZoneID(ctx context.Context, spotID
 
 func (r *GormParkingRepository) UpdateSpot(ctx context.Context, spot *model.ParkingSpot) error {
 	return r.db.WithContext(ctx).Save(spot).Error
+}
+
+func (r *GormParkingRepository) UpdateSpotStatusIfCurrent(
+	ctx context.Context,
+	spotID, zoneID int64,
+	current []model.SpotStatus,
+	next model.SpotStatus,
+	updatedAt time.Time,
+) (bool, error) {
+	result := r.db.WithContext(ctx).
+		Model(&model.ParkingSpot{}).
+		Where("id = ? AND zone_id = ? AND status IN ?", spotID, zoneID, current).
+		Updates(map[string]any{
+			"status":     next,
+			"updated_at": updatedAt,
+		})
+
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	return result.RowsAffected == 1, nil
 }

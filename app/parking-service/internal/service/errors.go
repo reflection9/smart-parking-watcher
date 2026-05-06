@@ -8,4 +8,6 @@ var (
 	ErrSpotAlreadyExists = errors.New("spot already exists in zone")
 	ErrSpotNotFound      = errors.New("spot not found")
 	ErrInvalidSpotStatus = errors.New("invalid spot status")
+	ErrSpotNotAvailable  = errors.New("spot is not available for reservation")
+	ErrSpotNotReserved   = errors.New("spot is not reserved")
 )

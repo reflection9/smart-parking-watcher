@@ -24,7 +24,11 @@ func main() {
 	router.GET("/zones", parkingHandler.ListZones)
 	router.GET("/zones/:id", parkingHandler.GetZoneByID)
 	router.POST("/zones/:zoneId/spots", parkingHandler.AddSpot)
+	router.GET("/zones/:zoneId/spots/:spotId", parkingHandler.GetSpotByID)
 	router.PATCH("/zones/:zoneId/spots/:spotId/status", parkingHandler.UpdateSpotStatus)
+	router.POST("/zones/:zoneId/spots/:spotId/reserve", parkingHandler.ReserveSpot)
+	router.POST("/zones/:zoneId/spots/:spotId/release", parkingHandler.ReleaseSpot)
+	router.POST("/zones/:zoneId/spots/:spotId/occupy", parkingHandler.OccupySpot)
 
 	log.Println("parking-service started on port", cfg.AppPort)
 	if err := router.Run(":" + cfg.AppPort); err != nil {

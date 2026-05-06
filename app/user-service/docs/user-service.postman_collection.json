@@ -6,7 +6,7 @@
   },
   "item": [
     {
-      "name": "Register user",
+      "name": "Зарегистрировать пользователя",
       "request": {
         "method": "POST",
         "header": [
@@ -32,7 +32,7 @@
       }
     },
     {
-      "name": "Login user",
+      "name": "Войти пользователем",
       "request": {
         "method": "POST",
         "header": [
@@ -58,7 +58,7 @@
       }
     },
     {
-      "name": "Get user by id",
+      "name": "Получить пользователя по id",
       "request": {
         "method": "GET",
         "url": {

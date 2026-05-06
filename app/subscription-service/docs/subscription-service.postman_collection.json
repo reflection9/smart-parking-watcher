@@ -6,7 +6,7 @@
   },
   "item": [
     {
-      "name": "Create subscription",
+      "name": "Создать подписку",
       "request": {
         "method": "POST",
         "header": [
@@ -31,7 +31,7 @@
       }
     },
     {
-      "name": "List subscriptions by user",
+      "name": "Получить подписки пользователя",
       "request": {
         "method": "GET",
         "url": {
@@ -48,7 +48,7 @@
       }
     },
     {
-      "name": "List subscriptions by zone",
+      "name": "Получить подписки зоны",
       "request": {
         "method": "GET",
         "url": {
@@ -65,7 +65,7 @@
       }
     },
     {
-      "name": "Delete subscription",
+      "name": "Удалить подписку",
       "request": {
         "method": "DELETE",
         "url": {

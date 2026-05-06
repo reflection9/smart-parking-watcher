@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"parking-service/internal/dto"
@@ -104,6 +105,33 @@ func (h *ParkingHandler) AddSpot(c *gin.Context) {
 	c.JSON(http.StatusCreated, response)
 }
 
+func (h *ParkingHandler) GetSpotByID(c *gin.Context) {
+	zoneID, err := strconv.ParseInt(c.Param("zoneId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid zone id"})
+		return
+	}
+
+	spotID, err := strconv.ParseInt(c.Param("spotId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid spot id"})
+		return
+	}
+
+	response, err := h.parkingService.GetSpotByID(c.Request.Context(), zoneID, spotID)
+	if err != nil {
+		if errors.Is(err, service.ErrSpotNotFound) || errors.Is(err, service.ErrZoneNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get spot"})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
 func (h *ParkingHandler) UpdateSpotStatus(c *gin.Context) {
 	zoneID, err := strconv.ParseInt(c.Param("zoneId"), 10, 64)
 	if err != nil {
@@ -135,6 +163,51 @@ func (h *ParkingHandler) UpdateSpotStatus(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update spot status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+func (h *ParkingHandler) ReserveSpot(c *gin.Context) {
+	h.transitionSpot(c, h.parkingService.ReserveSpot, "failed to reserve spot")
+}
+
+func (h *ParkingHandler) ReleaseSpot(c *gin.Context) {
+	h.transitionSpot(c, h.parkingService.ReleaseSpot, "failed to release spot")
+}
+
+func (h *ParkingHandler) OccupySpot(c *gin.Context) {
+	h.transitionSpot(c, h.parkingService.OccupySpot, "failed to occupy spot")
+}
+
+func (h *ParkingHandler) transitionSpot(
+	c *gin.Context,
+	action func(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error),
+	fallback string,
+) {
+	zoneID, err := strconv.ParseInt(c.Param("zoneId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid zone id"})
+		return
+	}
+
+	spotID, err := strconv.ParseInt(c.Param("spotId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid spot id"})
+		return
+	}
+
+	response, err := action(c.Request.Context(), zoneID, spotID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrSpotNotFound), errors.Is(err, service.ErrZoneNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case errors.Is(err, service.ErrSpotNotAvailable), errors.Is(err, service.ErrSpotNotReserved):
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fallback})
+		}
 		return
 	}
 
