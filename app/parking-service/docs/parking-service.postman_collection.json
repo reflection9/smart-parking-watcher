@@ -6,7 +6,7 @@
   },
   "item": [
     {
-      "name": "Create zone",
+      "name": "Создать зону",
       "request": {
         "method": "POST",
         "header": [
@@ -31,7 +31,7 @@
       }
     },
     {
-      "name": "List zones",
+      "name": "Получить список зон",
       "request": {
         "method": "GET",
         "url": {
@@ -46,7 +46,7 @@
       }
     },
     {
-      "name": "Get zone by id",
+      "name": "Получить зону по id",
       "request": {
         "method": "GET",
         "url": {
@@ -62,7 +62,7 @@
       }
     },
     {
-      "name": "Add spot to zone",
+      "name": "Добавить место в зону",
       "request": {
         "method": "POST",
         "header": [
@@ -89,7 +89,7 @@
       }
     },
     {
-      "name": "Update spot status",
+      "name": "Обновить статус места",
       "request": {
         "method": "PATCH",
         "header": [
@@ -113,6 +113,81 @@
             "spots",
             "1",
             "status"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Получить место по id",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/zones/1/spots/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "zones",
+            "1",
+            "spots",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Зарезервировать место",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/zones/1/spots/1/reserve",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "zones",
+            "1",
+            "spots",
+            "1",
+            "reserve"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Освободить место из брони",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/zones/1/spots/1/release",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "zones",
+            "1",
+            "spots",
+            "1",
+            "release"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Подтвердить занятие места",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/zones/1/spots/1/occupy",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "zones",
+            "1",
+            "spots",
+            "1",
+            "occupy"
           ]
         }
       }

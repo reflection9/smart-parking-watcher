@@ -6,7 +6,7 @@
   },
   "item": [
     {
-      "name": "Create event",
+      "name": "Создать событие",
       "request": {
         "method": "POST",
         "header": [
@@ -31,7 +31,7 @@
       }
     },
     {
-      "name": "List events by zone",
+      "name": "Получить события по зоне",
       "request": {
         "method": "GET",
         "url": {
@@ -48,7 +48,7 @@
       }
     },
     {
-      "name": "List events by spot",
+      "name": "Получить события по месту",
       "request": {
         "method": "GET",
         "url": {

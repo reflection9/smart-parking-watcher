@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"parking-service/internal/model"
+	"time"
 )
 
 type ParkingRepository interface {
@@ -14,4 +15,5 @@ type ParkingRepository interface {
 	GetSpotByZoneAndNumber(ctx context.Context, zoneID int64, number string) (*model.ParkingSpot, error)
 	GetSpotByIDAndZoneID(ctx context.Context, spotID, zoneID int64) (*model.ParkingSpot, error)
 	UpdateSpot(ctx context.Context, spot *model.ParkingSpot) error
+	UpdateSpotStatusIfCurrent(ctx context.Context, spotID, zoneID int64, current []model.SpotStatus, next model.SpotStatus, updatedAt time.Time) (bool, error)
 }

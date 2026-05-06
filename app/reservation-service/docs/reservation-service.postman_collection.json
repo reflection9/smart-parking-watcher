@@ -1,0 +1,125 @@
+{
+  "info": {
+    "name": "reservation-service",
+    "_postman_id": "2f8815a5-b1c8-4ce0-ac0f-46d9f01c8dd7",
+    "description": "Collection for testing reservation-service endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8086"
+    }
+  ],
+  "item": [
+    {
+      "name": "Создать бронь",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": 1,\n  \"zone_id\": 1,\n  \"spot_id\": 1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reservations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Получить бронь по id",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reservations/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Получить брони пользователя",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/reservations/users/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations",
+            "users",
+            "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Подтвердить бронь",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/reservations/1/confirm",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations",
+            "1",
+            "confirm"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Отменить бронь",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/reservations/1/cancel",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations",
+            "1",
+            "cancel"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Истечь бронь вручную",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/reservations/1/expire",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reservations",
+            "1",
+            "expire"
+          ]
+        }
+      }
+    }
+  ]
+}
