@@ -6,4 +6,5 @@ type CreateEventRequest struct {
 	EventType string `json:"event_type" binding:"required"`
 	OldStatus string `json:"old_status"`
 	NewStatus string `json:"new_status" binding:"required"`
+	Source    string `json:"source"`
 }

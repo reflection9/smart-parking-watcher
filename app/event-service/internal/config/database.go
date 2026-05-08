@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
@@ -22,5 +23,18 @@ func NewMongoCollection(cfg *Config) *mongo.Collection {
 		log.Fatalf("failed to ping mongo: %v", err)
 	}
 
-	return client.Database(cfg.MongoDBName).Collection(cfg.MongoCollection)
+	collection := client.Database(cfg.MongoDBName).Collection(cfg.MongoCollection)
+
+	indexCtx, indexCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer indexCancel()
+
+	_, err = collection.Indexes().CreateOne(indexCtx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "event_id", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	if err != nil {
+		log.Fatalf("failed to create mongo indexes: %v", err)
+	}
+
+	return collection
 }

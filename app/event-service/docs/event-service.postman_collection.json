@@ -63,6 +63,23 @@
           ]
         }
       }
+    },
+    {
+      "name": "Получить события по брони",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/events/reservations/1",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "reservations",
+            "1"
+          ]
+        }
+      }
     }
   ],
   "variable": [

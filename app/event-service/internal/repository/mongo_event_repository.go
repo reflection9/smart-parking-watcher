@@ -17,17 +17,21 @@ func NewMongoEventRepository(collection *mongo.Collection) *MongoEventRepository
 	return &MongoEventRepository{collection: collection}
 }
 
-func (r *MongoEventRepository) Create(ctx context.Context, event *model.Event) error {
+func (r *MongoEventRepository) Create(ctx context.Context, event *model.Event) (bool, error) {
 	result, err := r.collection.InsertOne(ctx, event)
 	if err != nil {
-		return err
+		if mongo.IsDuplicateKeyError(err) {
+			return false, nil
+		}
+
+		return false, err
 	}
 
 	if objectID, ok := result.InsertedID.(bson.ObjectID); ok {
 		event.ID = objectID
 	}
 
-	return nil
+	return true, nil
 }
 
 func (r *MongoEventRepository) ListByZoneID(ctx context.Context, zoneID int64) ([]model.Event, error) {
@@ -38,8 +42,12 @@ func (r *MongoEventRepository) ListBySpotID(ctx context.Context, spotID int64) (
 	return r.findMany(ctx, bson.M{"spot_id": spotID})
 }
 
+func (r *MongoEventRepository) ListByReservationID(ctx context.Context, reservationID int64) ([]model.Event, error) {
+	return r.findMany(ctx, bson.M{"reservation_id": reservationID})
+}
+
 func (r *MongoEventRepository) findMany(ctx context.Context, filter bson.M) ([]model.Event, error) {
-	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}})
+	opts := options.Find().SetSort(bson.D{{Key: "occurred_at", Value: -1}})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
