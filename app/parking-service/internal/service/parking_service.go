@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"parking-service/internal/dto"
+	"parking-service/internal/messaging"
 )
 
 type ParkingService interface {
@@ -15,4 +16,5 @@ type ParkingService interface {
 	ReserveSpot(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error)
 	ReleaseSpot(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error)
 	OccupySpot(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error)
+	HandleSpotCommand(ctx context.Context, command messaging.SpotCommand) error
 }

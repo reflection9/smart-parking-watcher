@@ -17,4 +17,5 @@ Minimal parking management service.
 ## Notes
 
 - When Kafka is configured, the service publishes `spot_reserved`, `spot_freed`, and `spot_occupied` events after successful status transitions.
+- In the orchestration flow the service also consumes `spot_reserve_requested` commands from Kafka and replies with correlated spot events for `reservation-service`.
 

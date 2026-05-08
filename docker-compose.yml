@@ -124,7 +124,9 @@ services:
     command: >
       sh -c "
       until pg_isready -h postgres -p 5432 -U postgres -d reservation_service_db; do sleep 2; done;
-      psql postgresql://postgres:postgres@postgres:5432/reservation_service_db -v ON_ERROR_STOP=1 -f /migrations/001_create_reservations.sql
+      for file in /migrations/*.sql; do
+        psql postgresql://postgres:postgres@postgres:5432/reservation_service_db -v ON_ERROR_STOP=1 -f $$file;
+      done
       "
     restart: "no"
 
@@ -174,6 +176,8 @@ services:
     depends_on:
       parking-db-migrate:
         condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
     environment:
       APP_PORT: 8083
       DB_HOST: postgres
@@ -183,6 +187,8 @@ services:
       DB_NAME: parking_service_db
       KAFKA_BROKERS: kafka:9092
       KAFKA_SPOT_TOPIC: spot-status-events
+      KAFKA_PARKING_COMMAND_TOPIC: parking-spot-commands
+      KAFKA_PARKING_COMMAND_GROUP_ID: parking-service-commands
     ports:
       - "8083:8083"
     restart: unless-stopped
@@ -241,6 +247,9 @@ services:
       PARKING_SERVICE_URL: http://parking-service:8083
       KAFKA_BROKERS: kafka:9092
       KAFKA_RESERVATION_TOPIC: reservation-lifecycle-events
+      KAFKA_PARKING_COMMAND_TOPIC: parking-spot-commands
+      KAFKA_SPOT_TOPIC: spot-status-events
+      KAFKA_SPOT_GROUP_ID: reservation-service-spots
       RESERVATION_TTL_MINUTES: 5
     ports:
       - "8086:8086"

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"reservation-service/internal/dto"
+	"reservation-service/internal/messaging"
 )
 
 type ReservationService interface {
@@ -12,4 +13,5 @@ type ReservationService interface {
 	Confirm(ctx context.Context, id uint) (*dto.ReservationResponse, error)
 	Cancel(ctx context.Context, id uint) (*dto.ReservationResponse, error)
 	Expire(ctx context.Context, id uint) (*dto.ReservationResponse, error)
+	HandleSpotEvent(ctx context.Context, event messaging.SpotStatusEvent) error
 }

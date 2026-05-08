@@ -19,6 +19,12 @@ type parkingService struct {
 	eventPublisher messaging.SpotEventPublisher
 }
 
+type spotEventMetadata struct {
+	reservationID *int64
+	userID        *int64
+	failureReason string
+}
+
 func NewParkingService(
 	parkingRepo repository.ParkingRepository,
 	eventPublisher messaging.SpotEventPublisher,
@@ -169,7 +175,7 @@ func (s *parkingService) UpdateSpotStatus(ctx context.Context, zoneID, spotID in
 	}
 
 	if oldStatus != spot.Status {
-		s.publishSpotEvent(ctx, spot, oldStatus, spot.Status)
+		s.publishSpotEvent(ctx, spot, oldStatus, spot.Status, nil)
 	}
 
 	response := toSpotResponse(*spot)
@@ -177,15 +183,106 @@ func (s *parkingService) UpdateSpotStatus(ctx context.Context, zoneID, spotID in
 }
 
 func (s *parkingService) ReserveSpot(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error) {
-	return s.transitionSpotStatus(ctx, zoneID, spotID, []model.SpotStatus{model.SpotStatusFree}, model.SpotStatusReserved, ErrSpotNotAvailable)
+	return s.transitionSpotStatus(
+		ctx,
+		zoneID,
+		spotID,
+		[]model.SpotStatus{model.SpotStatusFree},
+		model.SpotStatusReserved,
+		ErrSpotNotAvailable,
+		nil,
+	)
 }
 
 func (s *parkingService) ReleaseSpot(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error) {
-	return s.transitionSpotStatus(ctx, zoneID, spotID, []model.SpotStatus{model.SpotStatusReserved}, model.SpotStatusFree, ErrSpotNotReserved)
+	return s.transitionSpotStatus(
+		ctx,
+		zoneID,
+		spotID,
+		[]model.SpotStatus{model.SpotStatusReserved},
+		model.SpotStatusFree,
+		ErrSpotNotReserved,
+		nil,
+	)
 }
 
 func (s *parkingService) OccupySpot(ctx context.Context, zoneID, spotID int64) (*dto.ParkingSpotResponse, error) {
-	return s.transitionSpotStatus(ctx, zoneID, spotID, []model.SpotStatus{model.SpotStatusReserved}, model.SpotStatusOccupied, ErrSpotNotReserved)
+	return s.transitionSpotStatus(
+		ctx,
+		zoneID,
+		spotID,
+		[]model.SpotStatus{model.SpotStatusReserved},
+		model.SpotStatusOccupied,
+		ErrSpotNotReserved,
+		nil,
+	)
+}
+
+func (s *parkingService) HandleSpotCommand(
+	ctx context.Context,
+	command messaging.SpotCommand,
+) error {
+	reservationID := command.ReservationID
+	userID := command.UserID
+	metadata := &spotEventMetadata{
+		reservationID: &reservationID,
+		userID:        &userID,
+	}
+
+	var (
+		err          error
+		rejectedType string
+	)
+
+	switch command.EventType {
+	case messaging.SpotReserveRequestedCommand:
+		_, err = s.transitionSpotStatus(
+			ctx,
+			command.ZoneID,
+			command.SpotID,
+			[]model.SpotStatus{model.SpotStatusFree},
+			model.SpotStatusReserved,
+			ErrSpotNotAvailable,
+			metadata,
+		)
+		rejectedType = messaging.SpotReservationRejectedEvent
+	case messaging.SpotReleaseRequestedCommand:
+		_, err = s.transitionSpotStatus(
+			ctx,
+			command.ZoneID,
+			command.SpotID,
+			[]model.SpotStatus{model.SpotStatusReserved},
+			model.SpotStatusFree,
+			ErrSpotNotReserved,
+			metadata,
+		)
+		rejectedType = messaging.SpotReleaseRejectedEvent
+	case messaging.SpotOccupyRequestedCommand:
+		_, err = s.transitionSpotStatus(
+			ctx,
+			command.ZoneID,
+			command.SpotID,
+			[]model.SpotStatus{model.SpotStatusReserved},
+			model.SpotStatusOccupied,
+			ErrSpotNotReserved,
+			metadata,
+		)
+		rejectedType = messaging.SpotOccupationRejectedEvent
+	default:
+		return nil
+	}
+
+	if err == nil {
+		return nil
+	}
+
+	switch {
+	case errors.Is(err, ErrZoneNotFound), errors.Is(err, ErrSpotNotFound), errors.Is(err, ErrSpotNotAvailable), errors.Is(err, ErrSpotNotReserved):
+		s.publishRejectedSpotCommand(ctx, command, rejectedType, err.Error())
+		return nil
+	default:
+		return err
+	}
 }
 
 func (s *parkingService) transitionSpotStatus(
@@ -194,6 +291,7 @@ func (s *parkingService) transitionSpotStatus(
 	current []model.SpotStatus,
 	next model.SpotStatus,
 	conflictErr error,
+	metadata *spotEventMetadata,
 ) (*dto.ParkingSpotResponse, error) {
 	_, err := s.parkingRepo.GetZoneByID(ctx, zoneID)
 	if err != nil {
@@ -223,7 +321,7 @@ func (s *parkingService) transitionSpotStatus(
 
 	spot.Status = next
 	spot.UpdatedAt = now
-	s.publishSpotEvent(ctx, spot, oldStatus, next)
+	s.publishSpotEvent(ctx, spot, oldStatus, next, metadata)
 
 	response := toSpotResponse(*spot)
 	return &response, nil
@@ -233,6 +331,7 @@ func (s *parkingService) publishSpotEvent(
 	ctx context.Context,
 	spot *model.ParkingSpot,
 	oldStatus, newStatus model.SpotStatus,
+	metadata *spotEventMetadata,
 ) {
 	if spot == nil || oldStatus == newStatus {
 		return
@@ -249,15 +348,17 @@ func (s *parkingService) publishSpotEvent(
 	}
 
 	event := messaging.SpotStatusEvent{
-		EventID:    messaging.NewEventID(),
-		EventType:  eventType,
-		Source:     "parking-service",
-		OccurredAt: occurredAt,
-		ZoneID:     spot.ZoneID,
-		SpotID:     spot.ID,
-		Status:     string(newStatus),
-		OldStatus:  string(oldStatus),
-		NewStatus:  string(newStatus),
+		EventID:       messaging.NewEventID(),
+		EventType:     eventType,
+		Source:        "parking-service",
+		OccurredAt:    occurredAt,
+		ZoneID:        spot.ZoneID,
+		SpotID:        spot.ID,
+		Status:        string(newStatus),
+		OldStatus:     string(oldStatus),
+		NewStatus:     string(newStatus),
+		ReservationID: metadataValueReservationID(metadata),
+		UserID:        metadataValueUserID(metadata),
 	}
 
 	if err := s.eventPublisher.Publish(ctx, event); err != nil {
@@ -269,6 +370,50 @@ func (s *parkingService) publishSpotEvent(
 			err,
 		)
 	}
+}
+
+func (s *parkingService) publishRejectedSpotCommand(
+	ctx context.Context,
+	command messaging.SpotCommand,
+	eventType string,
+	reason string,
+) {
+	event := messaging.SpotStatusEvent{
+		EventID:       messaging.NewEventID(),
+		EventType:     eventType,
+		Source:        "parking-service",
+		OccurredAt:    time.Now(),
+		ZoneID:        command.ZoneID,
+		SpotID:        command.SpotID,
+		ReservationID: &command.ReservationID,
+		UserID:        &command.UserID,
+		FailureReason: reason,
+	}
+
+	if err := s.eventPublisher.Publish(ctx, event); err != nil {
+		log.Printf(
+			"failed to publish rejected spot command event %s for reservation %d: %v",
+			eventType,
+			command.ReservationID,
+			err,
+		)
+	}
+}
+
+func metadataValueReservationID(metadata *spotEventMetadata) *int64 {
+	if metadata == nil {
+		return nil
+	}
+
+	return metadata.reservationID
+}
+
+func metadataValueUserID(metadata *spotEventMetadata) *int64 {
+	if metadata == nil {
+		return nil
+	}
+
+	return metadata.userID
 }
 
 func mapSpotEventType(status model.SpotStatus) string {

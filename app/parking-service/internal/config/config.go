@@ -9,14 +9,16 @@ import (
 )
 
 type Config struct {
-	AppPort        string
-	DBHost         string
-	DBPort         string
-	DBUser         string
-	DBPassword     string
-	DBName         string
-	KafkaBrokers   []string
-	KafkaSpotTopic string
+	AppPort                    string
+	DBHost                     string
+	DBPort                     string
+	DBUser                     string
+	DBPassword                 string
+	DBName                     string
+	KafkaBrokers               []string
+	KafkaSpotTopic             string
+	KafkaParkingCommandTopic   string
+	KafkaParkingCommandGroupID string
 }
 
 func LoadConfig() *Config {
@@ -26,14 +28,16 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		AppPort:        getEnv("APP_PORT", "8083"),
-		DBHost:         getEnv("DB_HOST", "localhost"),
-		DBPort:         getEnv("DB_PORT", "5432"),
-		DBUser:         getEnv("DB_USER", "postgres"),
-		DBPassword:     getEnv("DB_PASSWORD", "postgres"),
-		DBName:         getEnv("DB_NAME", "parking_service_db"),
-		KafkaBrokers:   getEnvAsList("KAFKA_BROKERS"),
-		KafkaSpotTopic: getEnv("KAFKA_SPOT_TOPIC", "spot-status-events"),
+		AppPort:                    getEnv("APP_PORT", "8083"),
+		DBHost:                     getEnv("DB_HOST", "localhost"),
+		DBPort:                     getEnv("DB_PORT", "5432"),
+		DBUser:                     getEnv("DB_USER", "postgres"),
+		DBPassword:                 getEnv("DB_PASSWORD", "postgres"),
+		DBName:                     getEnv("DB_NAME", "parking_service_db"),
+		KafkaBrokers:               getEnvAsList("KAFKA_BROKERS"),
+		KafkaSpotTopic:             getEnv("KAFKA_SPOT_TOPIC", "spot-status-events"),
+		KafkaParkingCommandTopic:   getEnv("KAFKA_PARKING_COMMAND_TOPIC", "parking-spot-commands"),
+		KafkaParkingCommandGroupID: getEnv("KAFKA_PARKING_COMMAND_GROUP_ID", "parking-service-commands"),
 	}
 }
 
