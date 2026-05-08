@@ -41,7 +41,7 @@ func NewHTTPParkingSpotClient(baseURL string) ParkingSpotClient {
 }
 
 func (c *httpParkingSpotClient) GetByID(ctx context.Context, zoneID, spotID int64) (*ParkingSpotLookupResult, error) {
-	resp, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("%s/zones/%d/spots/%d", c.baseURL, zoneID, spotID))
+	resp, err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("%s/spots/%d/zones/%d", c.baseURL, spotID, zoneID))
 	if err != nil {
 		return nil, err
 	}

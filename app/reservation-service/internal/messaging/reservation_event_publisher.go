@@ -60,7 +60,6 @@ func (p *kafkaReservationEventPublisher) Publish(
 	}
 
 	message := kafka.Message{
-		Topic: p.topic,
 		Key:   []byte(strconv.FormatInt(event.ReservationID, 10)),
 		Value: payload,
 		Time:  event.OccurredAt,
