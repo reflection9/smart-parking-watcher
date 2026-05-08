@@ -66,7 +66,13 @@ func (c *kafkaReservationEventConsumer) Start(
 				return nil
 			}
 
-			return fmt.Errorf("failed to fetch kafka message: %w", err)
+			log.Printf("failed to fetch kafka message: %v", err)
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(2 * time.Second):
+			}
+			continue
 		}
 
 		var event ReservationLifecycleEvent

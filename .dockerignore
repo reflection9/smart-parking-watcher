@@ -1,0 +1,10 @@
+.git
+.gitignore
+docs/*.pdf
+docs/*.docx
+app/*/.gocache
+app/*/.tmp
+**/.gocache
+**/.tmp
+**/tmp
+**/bin

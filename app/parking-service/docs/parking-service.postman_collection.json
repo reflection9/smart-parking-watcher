@@ -122,14 +122,14 @@
       "request": {
         "method": "GET",
         "url": {
-          "raw": "{{baseUrl}}/zones/1/spots/1",
+          "raw": "{{baseUrl}}/spots/1/zones/1",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "zones",
-            "1",
             "spots",
+            "1",
+            "zones",
             "1"
           ]
         }
