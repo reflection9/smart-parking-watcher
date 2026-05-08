@@ -68,3 +68,19 @@ func (h *EventHandler) ListBySpotID(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
+
+func (h *EventHandler) ListByReservationID(c *gin.Context) {
+	reservationID, err := strconv.ParseInt(c.Param("reservationId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid reservation id"})
+		return
+	}
+
+	response, err := h.eventService.ListByReservationID(c.Request.Context(), reservationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get events"})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}

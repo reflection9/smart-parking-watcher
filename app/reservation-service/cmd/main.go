@@ -4,6 +4,7 @@ import (
 	"log"
 	"reservation-service/internal/config"
 	"reservation-service/internal/handler"
+	"reservation-service/internal/messaging"
 	"reservation-service/internal/repository"
 	"reservation-service/internal/service"
 
@@ -17,12 +18,25 @@ func main() {
 	reservationRepo := repository.NewGormReservationRepository(reservationDB)
 	userLookupClient := service.NewHTTPUserLookupClient(cfg.UserServiceURL)
 	parkingSpotClient := service.NewHTTPParkingSpotClient(cfg.ParkingServiceURL)
+	eventPublisher := messaging.NewNoopReservationEventPublisher()
+	if len(cfg.KafkaBrokers) > 0 {
+		eventPublisher = messaging.NewKafkaReservationEventPublisher(cfg.KafkaBrokers, cfg.KafkaTopic)
+		log.Println("reservation-service Kafka publisher enabled for topic", cfg.KafkaTopic)
+	} else {
+		log.Println("reservation-service Kafka publisher disabled")
+	}
+	defer func() {
+		if err := eventPublisher.Close(); err != nil {
+			log.Println("failed to close reservation event publisher:", err)
+		}
+	}()
 
 	reservationService := service.NewReservationService(
 		reservationRepo,
 		userLookupClient,
 		parkingSpotClient,
 		cfg.ReservationTTL,
+		eventPublisher,
 	)
 	reservationHandler := handler.NewReservationHandler(reservationService)
 

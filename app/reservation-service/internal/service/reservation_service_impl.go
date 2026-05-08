@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"reservation-service/internal/dto"
+	"reservation-service/internal/messaging"
 	"reservation-service/internal/model"
 	"reservation-service/internal/repository"
 	"time"
@@ -17,6 +19,7 @@ type reservationService struct {
 	userLookupClient  UserLookupClient
 	parkingSpotClient ParkingSpotClient
 	reservationTTL    time.Duration
+	eventPublisher    messaging.ReservationEventPublisher
 }
 
 func NewReservationService(
@@ -24,9 +27,13 @@ func NewReservationService(
 	userLookupClient UserLookupClient,
 	parkingSpotClient ParkingSpotClient,
 	reservationTTL time.Duration,
+	eventPublisher messaging.ReservationEventPublisher,
 ) ReservationService {
 	if reservationTTL <= 0 {
-		reservationTTL = 10 * time.Minute
+		reservationTTL = 5 * time.Minute
+	}
+	if eventPublisher == nil {
+		eventPublisher = messaging.NewNoopReservationEventPublisher()
 	}
 
 	return &reservationService{
@@ -34,6 +41,7 @@ func NewReservationService(
 		userLookupClient:  userLookupClient,
 		parkingSpotClient: parkingSpotClient,
 		reservationTTL:    reservationTTL,
+		eventPublisher:    eventPublisher,
 	}
 }
 
@@ -102,6 +110,8 @@ func (s *reservationService) Create(
 		return nil, err
 	}
 
+	s.publishReservationEvent(ctx, reservation, messaging.ReservationCreatedEvent)
+
 	response := toReservationResponse(*reservation)
 	return &response, nil
 }
@@ -163,6 +173,8 @@ func (s *reservationService) Confirm(ctx context.Context, id uint) (*dto.Reserva
 		return nil, err
 	}
 
+	s.publishReservationEvent(ctx, reservation, messaging.ReservationConfirmedEvent)
+
 	response := toReservationResponse(*reservation)
 	return &response, nil
 }
@@ -190,6 +202,8 @@ func (s *reservationService) Cancel(ctx context.Context, id uint) (*dto.Reservat
 		return nil, err
 	}
 
+	s.publishReservationEvent(ctx, reservation, messaging.ReservationCancelledEvent)
+
 	response := toReservationResponse(*reservation)
 	return &response, nil
 }
@@ -216,6 +230,8 @@ func (s *reservationService) Expire(ctx context.Context, id uint) (*dto.Reservat
 	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 		return nil, err
 	}
+
+	s.publishReservationEvent(ctx, reservation, messaging.ReservationExpiredEvent)
 
 	response := toReservationResponse(*reservation)
 	return &response, nil
@@ -266,7 +282,13 @@ func (s *reservationService) expireExistingReservation(
 	reservation.ConfirmedAt = nil
 	reservation.UpdatedAt = now
 
-	return s.reservationRepo.Update(ctx, reservation)
+	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
+		return err
+	}
+
+	s.publishReservationEvent(ctx, reservation, messaging.ReservationExpiredEvent)
+
+	return nil
 }
 
 func wrapDependencyError(err error) error {
@@ -291,5 +313,38 @@ func toReservationResponse(reservation model.Reservation) dto.ReservationRespons
 		ConfirmedAt: reservation.ConfirmedAt,
 		CreatedAt:   reservation.CreatedAt,
 		UpdatedAt:   reservation.UpdatedAt,
+	}
+}
+
+func (s *reservationService) publishReservationEvent(
+	ctx context.Context,
+	reservation *model.Reservation,
+	eventType string,
+) {
+	if reservation == nil {
+		return
+	}
+
+	occurredAt := reservation.UpdatedAt
+	if occurredAt.IsZero() {
+		occurredAt = time.Now()
+	}
+
+	event := messaging.ReservationLifecycleEvent{
+		EventID:       messaging.NewEventID(),
+		EventType:     eventType,
+		Source:        "reservation-service",
+		OccurredAt:    occurredAt,
+		ReservationID: int64(reservation.ID),
+		UserID:        reservation.UserID,
+		ZoneID:        reservation.ZoneID,
+		SpotID:        reservation.SpotID,
+		Status:        string(reservation.Status),
+		ExpiresAt:     &reservation.ExpiresAt,
+		ConfirmedAt:   reservation.ConfirmedAt,
+	}
+
+	if err := s.eventPublisher.Publish(ctx, event); err != nil {
+		log.Printf("failed to publish reservation event %s for reservation %d: %v", eventType, reservation.ID, err)
 	}
 }

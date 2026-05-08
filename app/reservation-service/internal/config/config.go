@@ -21,6 +21,8 @@ type Config struct {
 
 	UserServiceURL    string
 	ParkingServiceURL string
+	KafkaBrokers      []string
+	KafkaTopic        string
 
 	ReservationTTL time.Duration
 }
@@ -37,9 +39,9 @@ func LoadConfig() *Config {
 	dbPassword := getEnv("DB_PASSWORD", "postgres")
 	dbName := getEnv("DB_NAME", "reservation_service_db")
 
-	ttlMinutes := getEnvAsInt("RESERVATION_TTL_MINUTES", 10)
+	ttlMinutes := getEnvAsInt("RESERVATION_TTL_MINUTES", 5)
 	if ttlMinutes <= 0 {
-		ttlMinutes = 10
+		ttlMinutes = 5
 	}
 
 	return &Config{
@@ -53,6 +55,8 @@ func LoadConfig() *Config {
 
 		UserServiceURL:    getEnv("USER_SERVICE_URL", "http://localhost:8081"),
 		ParkingServiceURL: getEnv("PARKING_SERVICE_URL", "http://localhost:8083"),
+		KafkaBrokers:      getEnvAsList("KAFKA_BROKERS"),
+		KafkaTopic:        getEnv("KAFKA_RESERVATION_TOPIC", "reservation-lifecycle-events"),
 
 		ReservationTTL: time.Duration(ttlMinutes) * time.Minute,
 	}
@@ -84,4 +88,26 @@ func getEnvAsInt(key string, fallback int) int {
 	}
 
 	return parsed
+}
+
+func getEnvAsList(key string) []string {
+	value := getEnv(key, "")
+	if value == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
 }
