@@ -1,6 +1,6 @@
 # event-service
 
-Event history service for manual parking events and reservation lifecycle events from Kafka.
+Event history service for manual parking events, reservation lifecycle events, and spot status events from Kafka.
 
 ## Endpoints
 
@@ -12,5 +12,5 @@ Event history service for manual parking events and reservation lifecycle events
 ## Notes
 
 - Manual event creation over HTTP is still supported.
-- When Kafka is configured, the service consumes reservation lifecycle events and stores them in MongoDB.
+- When Kafka is configured, the service consumes reservation lifecycle events and spot status events and stores them in MongoDB.
 - Event history is idempotent by `event_id`, which allows safe repeated delivery from Kafka.

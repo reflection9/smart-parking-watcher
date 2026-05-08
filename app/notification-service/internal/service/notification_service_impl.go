@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"notification-service/internal/dto"
+	"notification-service/internal/messaging"
 	"notification-service/internal/model"
 	"notification-service/internal/repository"
 	"strings"
@@ -161,6 +162,25 @@ func (s *notificationService) GetByID(ctx context.Context, id uint) (*dto.Notifi
 
 	response := toNotificationResponse(*notification)
 	return &response, nil
+}
+
+func (s *notificationService) HandleSpotEvent(
+	ctx context.Context,
+	event messaging.SpotStatusEvent,
+) error {
+	if !strings.EqualFold(event.EventType, messaging.SpotFreedEvent) {
+		return nil
+	}
+
+	spotID := event.SpotID
+	_, err := s.DispatchSpotFreed(ctx, dto.DispatchNotificationRequest{
+		EventID:   event.EventID,
+		EventType: event.EventType,
+		ZoneID:    event.ZoneID,
+		SpotID:    &spotID,
+	})
+
+	return err
 }
 
 func newPendingNotification(

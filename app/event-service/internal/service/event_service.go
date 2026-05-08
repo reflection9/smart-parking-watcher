@@ -12,4 +12,5 @@ type EventService interface {
 	ListBySpotID(ctx context.Context, spotID int64) ([]dto.EventResponse, error)
 	ListByReservationID(ctx context.Context, reservationID int64) ([]dto.EventResponse, error)
 	HandleReservationEvent(ctx context.Context, event messaging.ReservationLifecycleEvent) error
+	HandleSpotEvent(ctx context.Context, event messaging.SpotStatusEvent) error
 }

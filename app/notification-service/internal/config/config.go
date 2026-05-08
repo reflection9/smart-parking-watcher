@@ -26,6 +26,9 @@ type Config struct {
 	SMTPPort       string
 	SMTPUsername   string
 	SMTPPassword   string
+	KafkaBrokers   []string
+	KafkaSpotTopic string
+	KafkaGroupID   string
 }
 
 func LoadConfig() *Config {
@@ -49,7 +52,7 @@ func LoadConfig() *Config {
 		DBPassword: dbPassword,
 		DBName:     dbName,
 
-		SubscriptionServiceURL: getEnv("SUBSCRIPTION_SERVICE_URL", "http://localhost:8083"),
+		SubscriptionServiceURL: getEnv("SUBSCRIPTION_SERVICE_URL", "http://localhost:8082"),
 		UserServiceURL:         getEnv("USER_SERVICE_URL", "http://localhost:8081"),
 
 		EmailTransport: strings.ToLower(getEnv("EMAIL_TRANSPORT", "log")),
@@ -58,6 +61,9 @@ func LoadConfig() *Config {
 		SMTPPort:       getEnv("SMTP_PORT", "587"),
 		SMTPUsername:   getEnv("SMTP_USERNAME", ""),
 		SMTPPassword:   getEnv("SMTP_PASSWORD", ""),
+		KafkaBrokers:   getEnvAsList("KAFKA_BROKERS"),
+		KafkaSpotTopic: getEnv("KAFKA_SPOT_TOPIC", "spot-status-events"),
+		KafkaGroupID:   getEnv("KAFKA_GROUP_ID", "notification-service-spots"),
 	}
 }
 
@@ -73,4 +79,26 @@ func getEnv(key, fallback string) string {
 	}
 
 	return value
+}
+
+func getEnvAsList(key string) []string {
+	value := getEnv(key, "")
+	if value == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
 }

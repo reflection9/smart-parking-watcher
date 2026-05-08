@@ -20,22 +20,42 @@ func main() {
 	eventService := service.NewEventService(eventRepo)
 	eventHandler := handler.NewEventHandler(eventService)
 
-	eventConsumer := messaging.NewNoopReservationEventConsumer()
+	reservationConsumer := messaging.NewNoopReservationEventConsumer()
+	spotConsumer := messaging.NewNoopSpotEventConsumer()
 	if len(cfg.KafkaBrokers) > 0 {
-		eventConsumer = messaging.NewKafkaReservationEventConsumer(cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID)
-		log.Println("event-service Kafka consumer enabled for topic", cfg.KafkaTopic)
+		reservationConsumer = messaging.NewKafkaReservationEventConsumer(
+			cfg.KafkaBrokers,
+			cfg.ReservationKafkaTopic,
+			cfg.ReservationGroupID,
+		)
+		spotConsumer = messaging.NewKafkaSpotEventConsumer(
+			cfg.KafkaBrokers,
+			cfg.SpotKafkaTopic,
+			cfg.SpotGroupID,
+		)
+		log.Println("event-service reservation Kafka consumer enabled for topic", cfg.ReservationKafkaTopic)
+		log.Println("event-service spot Kafka consumer enabled for topic", cfg.SpotKafkaTopic)
 
 		go func() {
-			if err := eventConsumer.Start(context.Background(), eventService); err != nil {
+			if err := reservationConsumer.Start(context.Background(), eventService); err != nil {
 				log.Println("reservation event consumer stopped with error:", err)
 			}
 		}()
+
+		go func() {
+			if err := spotConsumer.Start(context.Background(), eventService); err != nil {
+				log.Println("spot event consumer stopped with error:", err)
+			}
+		}()
 	} else {
-		log.Println("event-service Kafka consumer disabled")
+		log.Println("event-service Kafka consumers disabled")
 	}
 	defer func() {
-		if err := eventConsumer.Close(); err != nil {
+		if err := reservationConsumer.Close(); err != nil {
 			log.Println("failed to close reservation event consumer:", err)
+		}
+		if err := spotConsumer.Close(); err != nil {
+			log.Println("failed to close spot event consumer:", err)
 		}
 	}()
 

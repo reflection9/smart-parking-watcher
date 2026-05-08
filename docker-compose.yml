@@ -181,6 +181,8 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: parking_service_db
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_SPOT_TOPIC: spot-status-events
     ports:
       - "8083:8083"
     restart: unless-stopped
@@ -263,7 +265,9 @@ services:
       MONGO_COLLECTION: parking_events
       KAFKA_BROKERS: kafka:9092
       KAFKA_RESERVATION_TOPIC: reservation-lifecycle-events
-      KAFKA_GROUP_ID: event-service-history
+      KAFKA_RESERVATION_GROUP_ID: event-service-reservations
+      KAFKA_SPOT_TOPIC: spot-status-events
+      KAFKA_SPOT_GROUP_ID: event-service-spots
     ports:
       - "8084:8084"
     restart: unless-stopped
@@ -297,6 +301,9 @@ services:
       SMTP_PORT: 587
       SMTP_USERNAME: ""
       SMTP_PASSWORD: ""
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_SPOT_TOPIC: spot-status-events
+      KAFKA_GROUP_ID: notification-service-spots
     ports:
       - "8085:8085"
     restart: unless-stopped
