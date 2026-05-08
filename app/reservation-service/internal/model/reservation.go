@@ -7,7 +7,7 @@ type Reservation struct {
 	UserID      int64             `gorm:"not null;index" json:"user_id"`
 	ZoneID      int64             `gorm:"not null;index" json:"zone_id"`
 	SpotID      int64             `gorm:"not null;index" json:"spot_id"`
-	Status      ReservationStatus `gorm:"type:varchar(20);not null;default:'ACTIVE';index" json:"status"`
+	Status      ReservationStatus `gorm:"type:varchar(20);not null;default:'PENDING';index" json:"status"`
 	ExpiresAt   time.Time         `gorm:"not null;index" json:"expires_at"`
 	ConfirmedAt *time.Time        `json:"confirmed_at,omitempty"`
 	CreatedAt   time.Time         `json:"created_at"`

@@ -19,10 +19,13 @@ type Config struct {
 	DBPassword string
 	DBName     string
 
-	UserServiceURL    string
-	ParkingServiceURL string
-	KafkaBrokers      []string
-	KafkaTopic        string
+	UserServiceURL           string
+	ParkingServiceURL        string
+	KafkaBrokers             []string
+	KafkaReservationTopic    string
+	KafkaParkingCommandTopic string
+	KafkaSpotTopic           string
+	KafkaSpotGroupID         string
 
 	ReservationTTL time.Duration
 }
@@ -53,10 +56,13 @@ func LoadConfig() *Config {
 		DBPassword: dbPassword,
 		DBName:     dbName,
 
-		UserServiceURL:    getEnv("USER_SERVICE_URL", "http://localhost:8081"),
-		ParkingServiceURL: getEnv("PARKING_SERVICE_URL", "http://localhost:8083"),
-		KafkaBrokers:      getEnvAsList("KAFKA_BROKERS"),
-		KafkaTopic:        getEnv("KAFKA_RESERVATION_TOPIC", "reservation-lifecycle-events"),
+		UserServiceURL:           getEnv("USER_SERVICE_URL", "http://localhost:8081"),
+		ParkingServiceURL:        getEnv("PARKING_SERVICE_URL", "http://localhost:8083"),
+		KafkaBrokers:             getEnvAsList("KAFKA_BROKERS"),
+		KafkaReservationTopic:    getEnv("KAFKA_RESERVATION_TOPIC", "reservation-lifecycle-events"),
+		KafkaParkingCommandTopic: getEnv("KAFKA_PARKING_COMMAND_TOPIC", "parking-spot-commands"),
+		KafkaSpotTopic:           getEnv("KAFKA_SPOT_TOPIC", "spot-status-events"),
+		KafkaSpotGroupID:         getEnv("KAFKA_SPOT_GROUP_ID", "reservation-service-spots"),
 
 		ReservationTTL: time.Duration(ttlMinutes) * time.Minute,
 	}

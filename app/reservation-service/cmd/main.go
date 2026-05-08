@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"reservation-service/internal/config"
 	"reservation-service/internal/handler"
@@ -19,15 +20,29 @@ func main() {
 	userLookupClient := service.NewHTTPUserLookupClient(cfg.UserServiceURL)
 	parkingSpotClient := service.NewHTTPParkingSpotClient(cfg.ParkingServiceURL)
 	eventPublisher := messaging.NewNoopReservationEventPublisher()
+	parkingCommandPublisher := messaging.NewNoopParkingCommandPublisher()
+	spotEventConsumer := messaging.NewNoopSpotEventConsumer()
 	if len(cfg.KafkaBrokers) > 0 {
-		eventPublisher = messaging.NewKafkaReservationEventPublisher(cfg.KafkaBrokers, cfg.KafkaTopic)
-		log.Println("reservation-service Kafka publisher enabled for topic", cfg.KafkaTopic)
+		eventPublisher = messaging.NewKafkaReservationEventPublisher(cfg.KafkaBrokers, cfg.KafkaReservationTopic)
+		parkingCommandPublisher = messaging.NewKafkaParkingCommandPublisher(cfg.KafkaBrokers, cfg.KafkaParkingCommandTopic)
+		spotEventConsumer = messaging.NewKafkaSpotEventConsumer(cfg.KafkaBrokers, cfg.KafkaSpotTopic, cfg.KafkaSpotGroupID)
+		log.Println("reservation-service Kafka orchestration enabled")
 	} else {
-		log.Println("reservation-service Kafka publisher disabled")
+		log.Println("reservation-service Kafka orchestration disabled")
 	}
 	defer func() {
 		if err := eventPublisher.Close(); err != nil {
 			log.Println("failed to close reservation event publisher:", err)
+		}
+	}()
+	defer func() {
+		if err := parkingCommandPublisher.Close(); err != nil {
+			log.Println("failed to close parking command publisher:", err)
+		}
+	}()
+	defer func() {
+		if err := spotEventConsumer.Close(); err != nil {
+			log.Println("failed to close reservation spot event consumer:", err)
 		}
 	}()
 
@@ -37,8 +52,15 @@ func main() {
 		parkingSpotClient,
 		cfg.ReservationTTL,
 		eventPublisher,
+		parkingCommandPublisher,
 	)
 	reservationHandler := handler.NewReservationHandler(reservationService)
+
+	go func() {
+		if err := spotEventConsumer.Start(context.Background(), reservationService); err != nil {
+			log.Println("reservation-service spot event consumer stopped:", err)
+		}
+	}()
 
 	router := gin.Default()
 

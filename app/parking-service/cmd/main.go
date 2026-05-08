@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"parking-service/internal/config"
 	"parking-service/internal/handler"
@@ -17,20 +18,37 @@ func main() {
 
 	parkingRepo := repository.NewGormParkingRepository(db)
 	eventPublisher := messaging.NewNoopSpotEventPublisher()
+	commandConsumer := messaging.NewNoopParkingCommandConsumer()
 	if len(cfg.KafkaBrokers) > 0 {
 		eventPublisher = messaging.NewKafkaSpotEventPublisher(cfg.KafkaBrokers, cfg.KafkaSpotTopic)
-		log.Println("parking-service Kafka publisher enabled for topic", cfg.KafkaSpotTopic)
+		commandConsumer = messaging.NewKafkaParkingCommandConsumer(
+			cfg.KafkaBrokers,
+			cfg.KafkaParkingCommandTopic,
+			cfg.KafkaParkingCommandGroupID,
+		)
+		log.Println("parking-service Kafka orchestration enabled")
 	} else {
-		log.Println("parking-service Kafka publisher disabled")
+		log.Println("parking-service Kafka orchestration disabled")
 	}
 	defer func() {
 		if err := eventPublisher.Close(); err != nil {
 			log.Println("failed to close spot event publisher:", err)
 		}
 	}()
+	defer func() {
+		if err := commandConsumer.Close(); err != nil {
+			log.Println("failed to close parking command consumer:", err)
+		}
+	}()
 
 	parkingService := service.NewParkingService(parkingRepo, eventPublisher)
 	parkingHandler := handler.NewParkingHandler(parkingService)
+
+	go func() {
+		if err := commandConsumer.Start(context.Background(), parkingService); err != nil {
+			log.Println("parking-service command consumer stopped:", err)
+		}
+	}()
 
 	router := gin.Default()
 

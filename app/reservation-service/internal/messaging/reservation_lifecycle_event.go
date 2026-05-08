@@ -9,6 +9,7 @@ import (
 
 const (
 	ReservationCreatedEvent   = "reservation.created"
+	ReservationFailedEvent    = "reservation.failed"
 	ReservationConfirmedEvent = "reservation.confirmed"
 	ReservationCancelledEvent = "reservation.cancelled"
 	ReservationExpiredEvent   = "reservation.expired"

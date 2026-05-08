@@ -45,10 +45,24 @@ func (r *GormReservationRepository) ListByUserID(ctx context.Context, userID int
 	return reservations, nil
 }
 
-func (r *GormReservationRepository) GetActiveBySpot(ctx context.Context, zoneID, spotID int64) (*model.Reservation, error) {
+func (r *GormReservationRepository) GetOpenBySpot(
+	ctx context.Context,
+	zoneID, spotID int64,
+) (*model.Reservation, error) {
 	var reservation model.Reservation
 	err := r.db.WithContext(ctx).
-		Where("zone_id = ? AND spot_id = ? AND status = ?", zoneID, spotID, model.ReservationStatusActive).
+		Where(
+			"zone_id = ? AND spot_id = ? AND status IN ?",
+			zoneID,
+			spotID,
+			[]model.ReservationStatus{
+				model.ReservationStatusPending,
+				model.ReservationStatusActive,
+				model.ReservationStatusConfirming,
+				model.ReservationStatusCancelling,
+				model.ReservationStatusExpiring,
+			},
+		).
 		Order("created_at DESC").
 		First(&reservation).Error
 	if err != nil {

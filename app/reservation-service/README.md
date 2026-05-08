@@ -14,7 +14,8 @@ Reservation service for temporary parking spot bookings.
 ## Notes
 
 - The service stores reservations in PostgreSQL.
-- Spot state changes are delegated to `parking-service` over HTTP.
+- Reservation creation is orchestrated through Kafka: a new reservation starts in `PENDING`, `parking-service` reserves the spot asynchronously, and then the reservation moves to `ACTIVE` or `FAILED`.
+- Confirmation, cancellation, and expiration still delegate spot state changes to `parking-service` over HTTP.
 - User existence is validated through `user-service`.
 - Reservation lifecycle events are published to Kafka when the broker is configured.
 - Reservation TTL is stored in the reservation record through `expires_at`.

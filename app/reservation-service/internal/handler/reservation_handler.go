@@ -121,7 +121,7 @@ func (h *ReservationHandler) writeError(c *gin.Context, err error, fallback stri
 	switch {
 	case errors.Is(err, service.ErrUserNotFound), errors.Is(err, service.ErrSpotNotFound), errors.Is(err, service.ErrReservationNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-	case errors.Is(err, service.ErrSpotUnavailable), errors.Is(err, service.ErrReservationNotActive), errors.Is(err, service.ErrReservationExpired), errors.Is(err, service.ErrActiveReservationExists):
+	case errors.Is(err, service.ErrSpotUnavailable), errors.Is(err, service.ErrReservationNotActive), errors.Is(err, service.ErrReservationExpired), errors.Is(err, service.ErrActiveReservationExists), errors.Is(err, service.ErrReservationActionNotAllowed):
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 	case errors.Is(err, service.ErrDependencyUnavailable):
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
