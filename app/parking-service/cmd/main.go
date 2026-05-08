@@ -4,6 +4,7 @@ import (
 	"log"
 	"parking-service/internal/config"
 	"parking-service/internal/handler"
+	"parking-service/internal/messaging"
 	"parking-service/internal/repository"
 	"parking-service/internal/service"
 
@@ -15,7 +16,20 @@ func main() {
 	db := config.NewDatabase(cfg)
 
 	parkingRepo := repository.NewGormParkingRepository(db)
-	parkingService := service.NewParkingService(parkingRepo)
+	eventPublisher := messaging.NewNoopSpotEventPublisher()
+	if len(cfg.KafkaBrokers) > 0 {
+		eventPublisher = messaging.NewKafkaSpotEventPublisher(cfg.KafkaBrokers, cfg.KafkaSpotTopic)
+		log.Println("parking-service Kafka publisher enabled for topic", cfg.KafkaSpotTopic)
+	} else {
+		log.Println("parking-service Kafka publisher disabled")
+	}
+	defer func() {
+		if err := eventPublisher.Close(); err != nil {
+			log.Println("failed to close spot event publisher:", err)
+		}
+	}()
+
+	parkingService := service.NewParkingService(parkingRepo, eventPublisher)
 	parkingHandler := handler.NewParkingHandler(parkingService)
 
 	router := gin.Default()

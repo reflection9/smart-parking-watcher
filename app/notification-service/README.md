@@ -14,4 +14,5 @@ Email notification service for users subscribed to parking zones.
 - Duplicate notifications are blocked by the unique pair `event_id + user_id`.
 - Subscriber IDs are requested from `subscription-service` over HTTP.
 - Recipient emails are fetched from `user-service`.
+- When Kafka is configured, the service consumes `spot_freed` events directly from the broker.
 - If `EMAIL_TRANSPORT=log`, email delivery is logged instead of sent through SMTP.

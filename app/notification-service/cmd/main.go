@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"notification-service/internal/config"
 	"notification-service/internal/handler"
+	"notification-service/internal/messaging"
 	"notification-service/internal/repository"
 	"notification-service/internal/service"
 
@@ -39,6 +41,25 @@ func main() {
 		emailSender,
 	)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
+
+	spotConsumer := messaging.NewNoopSpotEventConsumer()
+	if len(cfg.KafkaBrokers) > 0 {
+		spotConsumer = messaging.NewKafkaSpotEventConsumer(cfg.KafkaBrokers, cfg.KafkaSpotTopic, cfg.KafkaGroupID)
+		log.Println("notification-service spot Kafka consumer enabled for topic", cfg.KafkaSpotTopic)
+
+		go func() {
+			if err := spotConsumer.Start(context.Background(), notificationService); err != nil {
+				log.Println("spot event consumer stopped with error:", err)
+			}
+		}()
+	} else {
+		log.Println("notification-service spot Kafka consumer disabled")
+	}
+	defer func() {
+		if err := spotConsumer.Close(); err != nil {
+			log.Println("failed to close spot event consumer:", err)
+		}
+	}()
 
 	router := gin.Default()
 

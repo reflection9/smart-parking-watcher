@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"log"
 	"parking-service/internal/dto"
+	"parking-service/internal/messaging"
 	"parking-service/internal/model"
 	"parking-service/internal/repository"
 	"strings"
@@ -13,12 +15,21 @@ import (
 )
 
 type parkingService struct {
-	parkingRepo repository.ParkingRepository
+	parkingRepo    repository.ParkingRepository
+	eventPublisher messaging.SpotEventPublisher
 }
 
-func NewParkingService(parkingRepo repository.ParkingRepository) ParkingService {
+func NewParkingService(
+	parkingRepo repository.ParkingRepository,
+	eventPublisher messaging.SpotEventPublisher,
+) ParkingService {
+	if eventPublisher == nil {
+		eventPublisher = messaging.NewNoopSpotEventPublisher()
+	}
+
 	return &parkingService{
-		parkingRepo: parkingRepo,
+		parkingRepo:    parkingRepo,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -149,11 +160,16 @@ func (s *parkingService) UpdateSpotStatus(ctx context.Context, zoneID, spotID in
 		return nil, err
 	}
 
+	oldStatus := spot.Status
 	spot.Status = model.SpotStatus(strings.ToUpper(req.Status))
 	spot.UpdatedAt = time.Now()
 
 	if err := s.parkingRepo.UpdateSpot(ctx, spot); err != nil {
 		return nil, err
+	}
+
+	if oldStatus != spot.Status {
+		s.publishSpotEvent(ctx, spot, oldStatus, spot.Status)
 	}
 
 	response := toSpotResponse(*spot)
@@ -196,6 +212,7 @@ func (s *parkingService) transitionSpotStatus(
 	}
 
 	now := time.Now()
+	oldStatus := spot.Status
 	updated, err := s.parkingRepo.UpdateSpotStatusIfCurrent(ctx, spotID, zoneID, current, next, now)
 	if err != nil {
 		return nil, err
@@ -206,9 +223,65 @@ func (s *parkingService) transitionSpotStatus(
 
 	spot.Status = next
 	spot.UpdatedAt = now
+	s.publishSpotEvent(ctx, spot, oldStatus, next)
 
 	response := toSpotResponse(*spot)
 	return &response, nil
+}
+
+func (s *parkingService) publishSpotEvent(
+	ctx context.Context,
+	spot *model.ParkingSpot,
+	oldStatus, newStatus model.SpotStatus,
+) {
+	if spot == nil || oldStatus == newStatus {
+		return
+	}
+
+	eventType := mapSpotEventType(newStatus)
+	if eventType == "" {
+		return
+	}
+
+	occurredAt := spot.UpdatedAt
+	if occurredAt.IsZero() {
+		occurredAt = time.Now()
+	}
+
+	event := messaging.SpotStatusEvent{
+		EventID:    messaging.NewEventID(),
+		EventType:  eventType,
+		Source:     "parking-service",
+		OccurredAt: occurredAt,
+		ZoneID:     spot.ZoneID,
+		SpotID:     spot.ID,
+		Status:     string(newStatus),
+		OldStatus:  string(oldStatus),
+		NewStatus:  string(newStatus),
+	}
+
+	if err := s.eventPublisher.Publish(ctx, event); err != nil {
+		log.Printf(
+			"failed to publish spot event %s for zone %d spot %d: %v",
+			eventType,
+			spot.ZoneID,
+			spot.ID,
+			err,
+		)
+	}
+}
+
+func mapSpotEventType(status model.SpotStatus) string {
+	switch status {
+	case model.SpotStatusReserved:
+		return messaging.SpotReservedEvent
+	case model.SpotStatusFree:
+		return messaging.SpotFreedEvent
+	case model.SpotStatusOccupied:
+		return messaging.SpotOccupiedEvent
+	default:
+		return ""
+	}
 }
 
 func toZoneResponse(zone model.Zone) dto.ZoneResponse {

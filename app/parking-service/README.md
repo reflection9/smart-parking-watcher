@@ -14,3 +14,7 @@ Minimal parking management service.
 - `POST /zones/:zoneId/spots/:spotId/release`
 - `POST /zones/:zoneId/spots/:spotId/occupy`
 
+## Notes
+
+- When Kafka is configured, the service publishes `spot_reserved`, `spot_freed`, and `spot_occupied` events after successful status transitions.
+

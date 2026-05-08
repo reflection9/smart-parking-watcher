@@ -37,12 +37,14 @@ func NewKafkaReservationEventConsumer(
 ) ReservationEventConsumer {
 	return &kafkaReservationEventConsumer{
 		reader: kafka.NewReader(kafka.ReaderConfig{
-			Brokers:        brokers,
-			Topic:          topic,
-			GroupID:        groupID,
-			MinBytes:       1,
-			MaxBytes:       10e6,
-			CommitInterval: 0,
+			Brokers:                brokers,
+			Topic:                  topic,
+			GroupID:                groupID,
+			MinBytes:               1,
+			MaxBytes:               10e6,
+			CommitInterval:         0,
+			WatchPartitionChanges:  true,
+			PartitionWatchInterval: time.Second,
 		}),
 	}
 }

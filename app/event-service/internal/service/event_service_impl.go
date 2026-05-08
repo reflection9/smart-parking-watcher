@@ -98,6 +98,27 @@ func (s *eventService) HandleReservationEvent(
 	return err
 }
 
+func (s *eventService) HandleSpotEvent(
+	ctx context.Context,
+	event messaging.SpotStatusEvent,
+) error {
+	historyEvent := &model.Event{
+		EventID:    event.EventID,
+		Source:     normalizeValue(event.Source, "parking-service"),
+		ZoneID:     event.ZoneID,
+		SpotID:     event.SpotID,
+		EventType:  event.EventType,
+		Status:     event.Status,
+		OldStatus:  event.OldStatus,
+		NewStatus:  event.NewStatus,
+		OccurredAt: event.OccurredAt,
+		CreatedAt:  time.Now(),
+	}
+
+	_, err := s.eventRepo.Create(ctx, historyEvent)
+	return err
+}
+
 func toEventResponses(events []model.Event) []dto.EventResponse {
 	response := make([]dto.EventResponse, 0, len(events))
 	for _, event := range events {
