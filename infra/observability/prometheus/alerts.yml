@@ -1,0 +1,40 @@
+groups:
+  - name: smart-parking-alerts
+    rules:
+      - alert: SmartParkingServiceDown
+        expr: up{job=~"user-service|parking-service|subscription-service|reservation-service|history-service|notification-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is down"
+          description: "Prometheus cannot scrape {{ $labels.job }} for more than 1 minute."
+
+      - alert: HighHttp5xxRate
+        expr: |
+          (
+            sum by (service) (rate(smart_parking_http_requests_total{status=~"5.."}[5m]))
+            /
+            clamp_min(sum by (service) (rate(smart_parking_http_requests_total[5m])), 0.001)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High 5xx rate on {{ $labels.service }}"
+          description: "More than 5% of HTTP requests ended with 5xx for 5 minutes."
+
+      - alert: HighHttpP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le, service) (
+              rate(smart_parking_http_request_duration_seconds_bucket[5m])
+            )
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High p95 latency on {{ $labels.service }}"
+          description: "p95 latency is above 1 second for 5 minutes."

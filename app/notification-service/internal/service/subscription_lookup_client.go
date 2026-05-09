@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	observability "smart-parking-observability"
 )
 
 type SubscriptionLookupClient interface {
@@ -25,9 +26,7 @@ type httpSubscriptionLookupClient struct {
 func NewHTTPSubscriptionLookupClient(baseURL string) SubscriptionLookupClient {
 	return &httpSubscriptionLookupClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		client: &http.Client{
-			Timeout: 3 * time.Second,
-		},
+		client:  observability.NewHTTPClient(3 * time.Second),
 	}
 }
 

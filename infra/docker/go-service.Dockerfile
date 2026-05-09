@@ -4,6 +4,8 @@ ARG SERVICE_NAME
 
 WORKDIR /src
 
+COPY shared/observability/ /src/shared/observability/
+
 COPY app/${SERVICE_NAME}/go.mod app/${SERVICE_NAME}/go.sum /src/app/${SERVICE_NAME}/
 
 WORKDIR /src/app/${SERVICE_NAME}

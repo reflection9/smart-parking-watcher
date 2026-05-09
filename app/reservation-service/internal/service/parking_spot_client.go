@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	observability "smart-parking-observability"
 )
 
 type ParkingSpotClient interface {
@@ -34,9 +35,7 @@ type httpParkingSpotClient struct {
 func NewHTTPParkingSpotClient(baseURL string) ParkingSpotClient {
 	return &httpParkingSpotClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		client: &http.Client{
-			Timeout: 3 * time.Second,
-		},
+		client:  observability.NewHTTPClient(3 * time.Second),
 	}
 }
 

@@ -59,10 +59,15 @@ func (c *noopSpotEventConsumer) Close() error {
 
 func (c *kafkaSpotEventConsumer) Start(ctx context.Context, handler SpotEventHandler) error {
 	for {
-		message, err := c.reader.FetchMessage(ctx)
+		fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		message, err := c.reader.FetchMessage(fetchCtx)
+		cancel()
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return nil
+			}
+			if errors.Is(err, context.DeadlineExceeded) {
+				continue
 			}
 
 			log.Printf("failed to fetch reservation-service spot kafka message: %v", err)

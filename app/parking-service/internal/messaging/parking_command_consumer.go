@@ -62,10 +62,15 @@ func (c *kafkaParkingCommandConsumer) Start(
 	handler ParkingCommandHandler,
 ) error {
 	for {
-		message, err := c.reader.FetchMessage(ctx)
+		fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		message, err := c.reader.FetchMessage(fetchCtx)
+		cancel()
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return nil
+			}
+			if errors.Is(err, context.DeadlineExceeded) {
+				continue
 			}
 
 			log.Printf("failed to fetch parking command kafka message: %v", err)

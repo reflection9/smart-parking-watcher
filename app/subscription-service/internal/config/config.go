@@ -17,6 +17,7 @@ type Config struct {
 	DBUser            string
 	DBPassword        string
 	DBName            string
+	OTLPEndpoint      string
 	UserServiceURL    string
 	ParkingServiceURL string
 	RedisAddr         string
@@ -39,6 +40,7 @@ func LoadConfig() *Config {
 		DBUser:            getEnv("DB_USER", "postgres"),
 		DBPassword:        getEnv("DB_PASSWORD", "postgres"),
 		DBName:            getEnv("DB_NAME", "subscription_service_db"),
+		OTLPEndpoint:      getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
 		UserServiceURL:    getEnv("USER_SERVICE_URL", "http://localhost:8081"),
 		ParkingServiceURL: getEnv("PARKING_SERVICE_URL", "http://localhost:8083"),
 		RedisAddr:         getEnv("REDIS_ADDR", ""),

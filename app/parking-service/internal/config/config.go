@@ -15,6 +15,7 @@ type Config struct {
 	DBUser                     string
 	DBPassword                 string
 	DBName                     string
+	OTLPEndpoint               string
 	KafkaBrokers               []string
 	KafkaSpotTopic             string
 	KafkaParkingCommandTopic   string
@@ -34,6 +35,7 @@ func LoadConfig() *Config {
 		DBUser:                     getEnv("DB_USER", "postgres"),
 		DBPassword:                 getEnv("DB_PASSWORD", "postgres"),
 		DBName:                     getEnv("DB_NAME", "parking_service_db"),
+		OTLPEndpoint:               getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
 		KafkaBrokers:               getEnvAsList("KAFKA_BROKERS"),
 		KafkaSpotTopic:             getEnv("KAFKA_SPOT_TOPIC", "spot-status-events"),
 		KafkaParkingCommandTopic:   getEnv("KAFKA_PARKING_COMMAND_TOPIC", "parking-spot-commands"),
