@@ -26,6 +26,10 @@ type Config struct {
 	KafkaParkingCommandTopic string
 	KafkaSpotTopic           string
 	KafkaSpotGroupID         string
+	RedisAddr                string
+	RedisPassword            string
+	RedisDB                  int
+	RedisKeyPrefix           string
 
 	ReservationTTL time.Duration
 }
@@ -63,6 +67,10 @@ func LoadConfig() *Config {
 		KafkaParkingCommandTopic: getEnv("KAFKA_PARKING_COMMAND_TOPIC", "parking-spot-commands"),
 		KafkaSpotTopic:           getEnv("KAFKA_SPOT_TOPIC", "spot-status-events"),
 		KafkaSpotGroupID:         getEnv("KAFKA_SPOT_GROUP_ID", "reservation-service-spots"),
+		RedisAddr:                getEnv("REDIS_ADDR", ""),
+		RedisPassword:            getEnv("REDIS_PASSWORD", ""),
+		RedisDB:                  getEnvAsInt("REDIS_DB", 0),
+		RedisKeyPrefix:           getEnv("REDIS_KEY_PREFIX", "reservation:ttl:"),
 
 		ReservationTTL: time.Duration(ttlMinutes) * time.Minute,
 	}

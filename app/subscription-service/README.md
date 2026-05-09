@@ -13,3 +13,4 @@ Minimal service for user subscriptions to parking zones.
 
 - Before creating a subscription, the service checks that the user exists in `user-service`.
 - It also checks that the parking zone exists in `parking-service`.
+- The subscriber list for a zone and the subscription list for a user are cached in Redis for hot reads.

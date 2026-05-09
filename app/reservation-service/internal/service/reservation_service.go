@@ -13,5 +13,6 @@ type ReservationService interface {
 	Confirm(ctx context.Context, id uint) (*dto.ReservationResponse, error)
 	Cancel(ctx context.Context, id uint) (*dto.ReservationResponse, error)
 	Expire(ctx context.Context, id uint) (*dto.ReservationResponse, error)
+	HandleTTLExpiration(ctx context.Context, id uint) error
 	HandleSpotEvent(ctx context.Context, event messaging.SpotStatusEvent) error
 }

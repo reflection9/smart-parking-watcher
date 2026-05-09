@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"reservation-service/internal/dto"
+	"reservation-service/internal/expiration"
 	"reservation-service/internal/messaging"
 	"reservation-service/internal/model"
 	"reservation-service/internal/repository"
@@ -21,6 +22,7 @@ type reservationService struct {
 	reservationTTL          time.Duration
 	eventPublisher          messaging.ReservationEventPublisher
 	parkingCommandPublisher messaging.ParkingCommandPublisher
+	reservationTTLTracker   expiration.ReservationTTLTracker
 }
 
 func NewReservationService(
@@ -30,6 +32,7 @@ func NewReservationService(
 	reservationTTL time.Duration,
 	eventPublisher messaging.ReservationEventPublisher,
 	parkingCommandPublisher messaging.ParkingCommandPublisher,
+	reservationTTLTracker expiration.ReservationTTLTracker,
 ) ReservationService {
 	if reservationTTL <= 0 {
 		reservationTTL = 5 * time.Minute
@@ -40,6 +43,9 @@ func NewReservationService(
 	if parkingCommandPublisher == nil {
 		parkingCommandPublisher = messaging.NewNoopParkingCommandPublisher()
 	}
+	if reservationTTLTracker == nil {
+		reservationTTLTracker = expiration.NewNoopReservationTTLTracker()
+	}
 
 	return &reservationService{
 		reservationRepo:         reservationRepo,
@@ -48,6 +54,7 @@ func NewReservationService(
 		reservationTTL:          reservationTTL,
 		eventPublisher:          eventPublisher,
 		parkingCommandPublisher: parkingCommandPublisher,
+		reservationTTLTracker:   reservationTTLTracker,
 	}
 }
 
@@ -106,6 +113,8 @@ func (s *reservationService) Create(
 	if err := s.reservationRepo.Create(ctx, reservation); err != nil {
 		return nil, err
 	}
+
+	s.syncReservationTTL(ctx, reservation)
 
 	if err := s.publishSpotCommand(ctx, reservation, messaging.SpotReserveRequestedCommand); err != nil {
 		s.markReservationFailed(ctx, reservation)
@@ -166,11 +175,13 @@ func (s *reservationService) Confirm(ctx context.Context, id uint) (*dto.Reserva
 	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 		return nil, err
 	}
+	s.syncReservationTTL(ctx, reservation)
 
 	if err := s.publishSpotCommand(ctx, reservation, messaging.SpotOccupyRequestedCommand); err != nil {
 		reservation.Status = model.ReservationStatusActive
 		reservation.UpdatedAt = time.Now()
 		_ = s.reservationRepo.Update(ctx, reservation)
+		s.syncReservationTTL(ctx, reservation)
 		return nil, wrapDependencyError(err)
 	}
 
@@ -194,6 +205,7 @@ func (s *reservationService) Cancel(ctx context.Context, id uint) (*dto.Reservat
 		if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 			return nil, err
 		}
+		s.syncReservationTTL(ctx, reservation)
 
 		s.publishReservationEvent(ctx, reservation, messaging.ReservationCancelledEvent)
 	case model.ReservationStatusActive:
@@ -203,10 +215,12 @@ func (s *reservationService) Cancel(ctx context.Context, id uint) (*dto.Reservat
 		if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 			return nil, err
 		}
+		s.syncReservationTTL(ctx, reservation)
 		if err := s.publishSpotCommand(ctx, reservation, messaging.SpotReleaseRequestedCommand); err != nil {
 			reservation.Status = model.ReservationStatusActive
 			reservation.UpdatedAt = time.Now()
 			_ = s.reservationRepo.Update(ctx, reservation)
+			s.syncReservationTTL(ctx, reservation)
 			return nil, wrapDependencyError(err)
 		}
 	default:
@@ -233,6 +247,7 @@ func (s *reservationService) Expire(ctx context.Context, id uint) (*dto.Reservat
 		if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 			return nil, err
 		}
+		s.syncReservationTTL(ctx, reservation)
 
 		s.publishReservationEvent(ctx, reservation, messaging.ReservationExpiredEvent)
 	case model.ReservationStatusActive:
@@ -242,10 +257,12 @@ func (s *reservationService) Expire(ctx context.Context, id uint) (*dto.Reservat
 		if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 			return nil, err
 		}
+		s.syncReservationTTL(ctx, reservation)
 		if err := s.publishSpotCommand(ctx, reservation, messaging.SpotReleaseRequestedCommand); err != nil {
 			reservation.Status = model.ReservationStatusActive
 			reservation.UpdatedAt = time.Now()
 			_ = s.reservationRepo.Update(ctx, reservation)
+			s.syncReservationTTL(ctx, reservation)
 			return nil, wrapDependencyError(err)
 		}
 	default:
@@ -254,6 +271,29 @@ func (s *reservationService) Expire(ctx context.Context, id uint) (*dto.Reservat
 
 	response := toReservationResponse(*reservation)
 	return &response, nil
+}
+
+func (s *reservationService) HandleTTLExpiration(ctx context.Context, id uint) error {
+	reservation, err := s.getReservationByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, ErrReservationNotFound) {
+			return nil
+		}
+
+		return err
+	}
+
+	switch reservation.Status {
+	case model.ReservationStatusPending, model.ReservationStatusActive:
+		_, err = s.Expire(ctx, id)
+		if err != nil && !errors.Is(err, ErrReservationActionNotAllowed) && !errors.Is(err, ErrReservationExpired) {
+			return err
+		}
+	default:
+		s.syncReservationTTL(ctx, reservation)
+	}
+
+	return nil
 }
 
 func (s *reservationService) HandleSpotEvent(ctx context.Context, event messaging.SpotStatusEvent) error {
@@ -327,6 +367,7 @@ func (s *reservationService) expireExistingReservation(
 	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 		return err
 	}
+	s.syncReservationTTL(ctx, reservation)
 
 	s.publishReservationEvent(ctx, reservation, messaging.ReservationExpiredEvent)
 
@@ -383,6 +424,7 @@ func (s *reservationService) handleSpotReserved(
 	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 		return err
 	}
+	s.syncReservationTTL(ctx, reservation)
 
 	s.publishReservationEvent(ctx, reservation, messaging.ReservationCreatedEvent)
 	return nil
@@ -404,6 +446,7 @@ func (s *reservationService) handleSpotReservationRejected(
 	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 		return err
 	}
+	s.syncReservationTTL(ctx, reservation)
 
 	s.publishReservationEvent(ctx, reservation, messaging.ReservationFailedEvent)
 	return nil
@@ -430,6 +473,7 @@ func (s *reservationService) handleSpotFreed(
 	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 		return err
 	}
+	s.syncReservationTTL(ctx, reservation)
 
 	if reservation.Status == model.ReservationStatusCancelled {
 		s.publishReservationEvent(ctx, reservation, messaging.ReservationCancelledEvent)
@@ -452,7 +496,11 @@ func (s *reservationService) handleSpotReleaseRejected(
 
 	reservation.Status = model.ReservationStatusActive
 	reservation.UpdatedAt = time.Now()
-	return s.reservationRepo.Update(ctx, reservation)
+	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
+		return err
+	}
+	s.syncReservationTTL(ctx, reservation)
+	return nil
 }
 
 func (s *reservationService) handleSpotOccupied(
@@ -471,6 +519,7 @@ func (s *reservationService) handleSpotOccupied(
 	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
 		return err
 	}
+	s.syncReservationTTL(ctx, reservation)
 
 	s.publishReservationEvent(ctx, reservation, messaging.ReservationConfirmedEvent)
 	return nil
@@ -487,7 +536,11 @@ func (s *reservationService) handleSpotOccupationRejected(
 	reservation.Status = model.ReservationStatusActive
 	reservation.ConfirmedAt = nil
 	reservation.UpdatedAt = time.Now()
-	return s.reservationRepo.Update(ctx, reservation)
+	if err := s.reservationRepo.Update(ctx, reservation); err != nil {
+		return err
+	}
+	s.syncReservationTTL(ctx, reservation)
+	return nil
 }
 
 func (s *reservationService) markReservationFailed(
@@ -504,6 +557,7 @@ func (s *reservationService) markReservationFailed(
 		log.Printf("failed to mark reservation %d as failed: %v", reservation.ID, err)
 		return
 	}
+	s.syncReservationTTL(ctx, reservation)
 
 	s.publishReservationEvent(ctx, reservation, messaging.ReservationFailedEvent)
 }
@@ -527,6 +581,28 @@ func isOpenReservationStatus(status model.ReservationStatus) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (s *reservationService) syncReservationTTL(ctx context.Context, reservation *model.Reservation) {
+	if reservation == nil {
+		return
+	}
+
+	var err error
+	switch reservation.Status {
+	case model.ReservationStatusPending, model.ReservationStatusActive:
+		if s.isExpired(reservation) {
+			err = s.reservationTTLTracker.RemoveReservation(ctx, reservation.ID)
+		} else {
+			err = s.reservationTTLTracker.TrackReservation(ctx, reservation.ID, reservation.ExpiresAt)
+		}
+	default:
+		err = s.reservationTTLTracker.RemoveReservation(ctx, reservation.ID)
+	}
+
+	if err != nil {
+		log.Printf("failed to sync Redis TTL for reservation %d with status %s: %v", reservation.ID, reservation.Status, err)
 	}
 }
 
