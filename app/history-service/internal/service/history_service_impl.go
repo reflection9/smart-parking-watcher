@@ -2,27 +2,52 @@ package service
 
 import (
 	"context"
-	"event-service/internal/dto"
-	"event-service/internal/messaging"
-	"event-service/internal/model"
-	"event-service/internal/repository"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
+
+	"history-service/internal/archive"
+	"history-service/internal/dto"
+	"history-service/internal/messaging"
+	"history-service/internal/model"
+	"history-service/internal/repository"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-type eventService struct {
-	eventRepo repository.EventRepository
+type historyService struct {
+	eventRepo         repository.EventRepository
+	coldStorage       archive.ColdStorage
+	archiveAfter      time.Duration
+	archiveBatchLimit int64
 }
 
-func NewEventService(eventRepo repository.EventRepository) EventService {
-	return &eventService{
-		eventRepo: eventRepo,
+func NewHistoryService(
+	eventRepo repository.EventRepository,
+	coldStorage archive.ColdStorage,
+	archiveAfter time.Duration,
+	archiveBatchLimit int64,
+) HistoryService {
+	if coldStorage == nil {
+		coldStorage = archive.NewNoopColdStorage()
+	}
+	if archiveAfter <= 0 {
+		archiveAfter = 30 * 24 * time.Hour
+	}
+	if archiveBatchLimit <= 0 {
+		archiveBatchLimit = 500
+	}
+
+	return &historyService{
+		eventRepo:         eventRepo,
+		coldStorage:       coldStorage,
+		archiveAfter:      archiveAfter,
+		archiveBatchLimit: archiveBatchLimit,
 	}
 }
 
-func (s *eventService) Create(ctx context.Context, req dto.CreateEventRequest) (*dto.EventResponse, error) {
+func (s *historyService) Create(ctx context.Context, req dto.CreateEventRequest) (*dto.EventResponse, error) {
 	now := time.Now()
 	event := &model.Event{
 		EventID:    "manual-" + bson.NewObjectID().Hex(),
@@ -45,7 +70,7 @@ func (s *eventService) Create(ctx context.Context, req dto.CreateEventRequest) (
 	return &response, nil
 }
 
-func (s *eventService) ListByZoneID(ctx context.Context, zoneID int64) ([]dto.EventResponse, error) {
+func (s *historyService) ListByZoneID(ctx context.Context, zoneID int64) ([]dto.EventResponse, error) {
 	events, err := s.eventRepo.ListByZoneID(ctx, zoneID)
 	if err != nil {
 		return nil, err
@@ -54,7 +79,7 @@ func (s *eventService) ListByZoneID(ctx context.Context, zoneID int64) ([]dto.Ev
 	return toEventResponses(events), nil
 }
 
-func (s *eventService) ListBySpotID(ctx context.Context, spotID int64) ([]dto.EventResponse, error) {
+func (s *historyService) ListBySpotID(ctx context.Context, spotID int64) ([]dto.EventResponse, error) {
 	events, err := s.eventRepo.ListBySpotID(ctx, spotID)
 	if err != nil {
 		return nil, err
@@ -63,7 +88,7 @@ func (s *eventService) ListBySpotID(ctx context.Context, spotID int64) ([]dto.Ev
 	return toEventResponses(events), nil
 }
 
-func (s *eventService) ListByReservationID(
+func (s *historyService) ListByReservationID(
 	ctx context.Context,
 	reservationID int64,
 ) ([]dto.EventResponse, error) {
@@ -75,7 +100,53 @@ func (s *eventService) ListByReservationID(
 	return toEventResponses(events), nil
 }
 
-func (s *eventService) HandleReservationEvent(
+func (s *historyService) ArchiveOldEvents(
+	ctx context.Context,
+	olderThan time.Duration,
+) (*dto.ArchiveHistoryResponse, error) {
+	if olderThan <= 0 {
+		olderThan = s.archiveAfter
+	}
+
+	cutoff := time.Now().Add(-olderThan)
+	events, err := s.eventRepo.ListOlderThan(ctx, cutoff, s.archiveBatchLimit)
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return &dto.ArchiveHistoryResponse{
+			ArchivedCount: 0,
+			Cutoff:        cutoff,
+		}, nil
+	}
+
+	payload, err := json.MarshalIndent(events, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	objectKey := buildArchiveObjectKey(events[0].OccurredAt)
+	if err := s.coldStorage.UploadArchive(ctx, objectKey, payload, "application/json"); err != nil {
+		return nil, err
+	}
+
+	ids := make([]bson.ObjectID, 0, len(events))
+	for _, event := range events {
+		ids = append(ids, event.ID)
+	}
+
+	if err := s.eventRepo.DeleteByIDs(ctx, ids); err != nil {
+		return nil, err
+	}
+
+	return &dto.ArchiveHistoryResponse{
+		ArchivedCount: len(events),
+		ObjectKey:     objectKey,
+		Cutoff:        cutoff,
+	}, nil
+}
+
+func (s *historyService) HandleReservationEvent(
 	ctx context.Context,
 	event messaging.ReservationLifecycleEvent,
 ) error {
@@ -98,7 +169,7 @@ func (s *eventService) HandleReservationEvent(
 	return err
 }
 
-func (s *eventService) HandleSpotEvent(
+func (s *historyService) HandleSpotEvent(
 	ctx context.Context,
 	event messaging.SpotStatusEvent,
 ) error {
@@ -155,4 +226,15 @@ func normalizeValue(value, fallback string) string {
 	}
 
 	return value
+}
+
+func buildArchiveObjectKey(occurredAt time.Time) string {
+	now := time.Now().UTC()
+	return fmt.Sprintf(
+		"history/%04d/%02d/%02d/archive-%s.json",
+		occurredAt.UTC().Year(),
+		occurredAt.UTC().Month(),
+		occurredAt.UTC().Day(),
+		now.Format("20060102T150405Z"),
+	)
 }
