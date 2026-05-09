@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"reservation-service/internal/config"
+	"reservation-service/internal/expiration"
 	"reservation-service/internal/handler"
 	"reservation-service/internal/messaging"
 	"reservation-service/internal/repository"
@@ -22,6 +23,7 @@ func main() {
 	eventPublisher := messaging.NewNoopReservationEventPublisher()
 	parkingCommandPublisher := messaging.NewNoopParkingCommandPublisher()
 	spotEventConsumer := messaging.NewNoopSpotEventConsumer()
+	reservationTTLTracker := expiration.NewNoopReservationTTLTracker()
 	if len(cfg.KafkaBrokers) > 0 {
 		eventPublisher = messaging.NewKafkaReservationEventPublisher(cfg.KafkaBrokers, cfg.KafkaReservationTopic)
 		parkingCommandPublisher = messaging.NewKafkaParkingCommandPublisher(cfg.KafkaBrokers, cfg.KafkaParkingCommandTopic)
@@ -29,6 +31,17 @@ func main() {
 		log.Println("reservation-service Kafka orchestration enabled")
 	} else {
 		log.Println("reservation-service Kafka orchestration disabled")
+	}
+	if cfg.RedisAddr != "" {
+		reservationTTLTracker = expiration.NewRedisReservationTTLTracker(
+			cfg.RedisAddr,
+			cfg.RedisPassword,
+			cfg.RedisDB,
+			cfg.RedisKeyPrefix,
+		)
+		log.Println("reservation-service Redis TTL enabled")
+	} else {
+		log.Println("reservation-service Redis TTL disabled")
 	}
 	defer func() {
 		if err := eventPublisher.Close(); err != nil {
@@ -45,6 +58,11 @@ func main() {
 			log.Println("failed to close reservation spot event consumer:", err)
 		}
 	}()
+	defer func() {
+		if err := reservationTTLTracker.Close(); err != nil {
+			log.Println("failed to close reservation Redis TTL tracker:", err)
+		}
+	}()
 
 	reservationService := service.NewReservationService(
 		reservationRepo,
@@ -53,12 +71,18 @@ func main() {
 		cfg.ReservationTTL,
 		eventPublisher,
 		parkingCommandPublisher,
+		reservationTTLTracker,
 	)
 	reservationHandler := handler.NewReservationHandler(reservationService)
 
 	go func() {
 		if err := spotEventConsumer.Start(context.Background(), reservationService); err != nil {
 			log.Println("reservation-service spot event consumer stopped:", err)
+		}
+	}()
+	go func() {
+		if err := reservationTTLTracker.Start(context.Background(), reservationService.HandleTTLExpiration); err != nil {
+			log.Println("reservation-service Redis TTL listener stopped:", err)
 		}
 	}()
 

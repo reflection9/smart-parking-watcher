@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"subscription-service/internal/cache"
 	"subscription-service/internal/config"
 	"subscription-service/internal/handler"
 	"subscription-service/internal/repository"
@@ -17,7 +18,31 @@ func main() {
 	subscriptionRepo := repository.NewGormSubscriptionRepository(db)
 	userLookupClient := service.NewHTTPUserLookupClient(cfg.UserServiceURL)
 	zoneLookupClient := service.NewHTTPZoneLookupClient(cfg.ParkingServiceURL)
-	subscriptionService := service.NewSubscriptionService(subscriptionRepo, userLookupClient, zoneLookupClient)
+	subscriptionCache := cache.NewNoopSubscriptionCache()
+	if cfg.RedisAddr != "" {
+		subscriptionCache = cache.NewRedisSubscriptionCache(
+			cfg.RedisAddr,
+			cfg.RedisPassword,
+			cfg.RedisDB,
+			cfg.RedisKeyPrefix,
+			cfg.RedisCacheTTL,
+		)
+		log.Println("subscription-service Redis cache enabled")
+	} else {
+		log.Println("subscription-service Redis cache disabled")
+	}
+	defer func() {
+		if err := subscriptionCache.Close(); err != nil {
+			log.Println("failed to close subscriptions cache:", err)
+		}
+	}()
+
+	subscriptionService := service.NewSubscriptionService(
+		subscriptionRepo,
+		userLookupClient,
+		zoneLookupClient,
+		subscriptionCache,
+	)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
 
 	router := gin.Default()

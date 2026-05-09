@@ -30,6 +30,18 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: smart-parking-redis
+    command: ["redis-server", "--notify-keyspace-events", "Ex"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   kafka:
     image: apache/kafka:3.9.0
     container_name: smart-parking-kafka
@@ -207,6 +219,8 @@ services:
         condition: service_started
       parking-service:
         condition: service_started
+      redis:
+        condition: service_healthy
     environment:
       APP_PORT: 8082
       DB_HOST: postgres
@@ -216,6 +230,11 @@ services:
       DB_NAME: subscription_service_db
       USER_SERVICE_URL: http://user-service:8081
       PARKING_SERVICE_URL: http://parking-service:8083
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      REDIS_KEY_PREFIX: "subscription_cache:"
+      REDIS_CACHE_TTL_SECONDS: 60
     ports:
       - "8082:8082"
     restart: unless-stopped
@@ -236,6 +255,8 @@ services:
         condition: service_started
       kafka:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       APP_PORT: 8086
       DB_HOST: postgres
@@ -250,6 +271,10 @@ services:
       KAFKA_PARKING_COMMAND_TOPIC: parking-spot-commands
       KAFKA_SPOT_TOPIC: spot-status-events
       KAFKA_SPOT_GROUP_ID: reservation-service-spots
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      REDIS_KEY_PREFIX: "reservation:ttl:"
       RESERVATION_TTL_MINUTES: 5
     ports:
       - "8086:8086"
