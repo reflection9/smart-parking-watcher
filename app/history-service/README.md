@@ -1,8 +1,8 @@
 # history-service
 
-History service for manual parking events, reservation lifecycle events, and spot status events from Kafka.
+Сервис истории для ручных событий парковки, событий жизненного цикла брони и событий статусов мест из Kafka.
 
-## Endpoints
+## Endpoint'ы
 
 - `POST /events`
 - `GET /events/zones/:zoneId`
@@ -10,9 +10,9 @@ History service for manual parking events, reservation lifecycle events, and spo
 - `GET /events/reservations/:reservationId`
 - `POST /history/archive`
 
-## Notes
+## Примечания
 
-- Manual event creation over HTTP is still supported.
-- When Kafka is configured, the service consumes reservation lifecycle events and spot status events and stores them in MongoDB as warm history.
-- Old history can be archived to MinIO cold storage and removed from MongoDB.
-- Event history is idempotent by `event_id`, which allows safe repeated delivery from Kafka.
+- Ручное создание событий по HTTP все еще поддерживается.
+- Когда Kafka настроена, сервис читает события жизненного цикла брони и события статусов мест и сохраняет их в `MongoDB` как теплую историю.
+- Старую историю можно архивировать в `MinIO` cold storage и удалять из `MongoDB`.
+- История событий идемпотентна по `event_id`, что позволяет безопасно переживать повторную доставку Kafka-сообщений.

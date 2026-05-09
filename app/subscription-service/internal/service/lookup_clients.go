@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	observability "smart-parking-observability"
 )
 
 type UserLookupClient interface {
@@ -30,18 +31,14 @@ type httpZoneLookupClient struct {
 func NewHTTPUserLookupClient(baseURL string) UserLookupClient {
 	return &httpUserLookupClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		client: &http.Client{
-			Timeout: 3 * time.Second,
-		},
+		client:  observability.NewHTTPClient(3 * time.Second),
 	}
 }
 
 func NewHTTPZoneLookupClient(baseURL string) ZoneLookupClient {
 	return &httpZoneLookupClient{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		client: &http.Client{
-			Timeout: 3 * time.Second,
-		},
+		client:  observability.NewHTTPClient(3 * time.Second),
 	}
 }
 

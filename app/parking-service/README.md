@@ -1,8 +1,8 @@
 # parking-service
 
-Minimal parking management service.
+Сервис управления парковочными зонами и парковочными местами.
 
-## Endpoints
+## Endpoint'ы
 
 - `POST /zones`
 - `GET /zones`
@@ -14,8 +14,7 @@ Minimal parking management service.
 - `POST /zones/:zoneId/spots/:spotId/release`
 - `POST /zones/:zoneId/spots/:spotId/occupy`
 
-## Notes
+## Примечания
 
-- When Kafka is configured, the service publishes `spot_reserved`, `spot_freed`, and `spot_occupied` events after successful status transitions.
-- In the orchestration flow the service also consumes `spot_reserve_requested` commands from Kafka and replies with correlated spot events for `reservation-service`.
-
+- Когда Kafka настроена, сервис публикует события `spot_reserved`, `spot_freed` и `spot_occupied` после успешных переходов статуса.
+- В orchestration flow сервис также читает команды `spot_reserve_requested` из Kafka и отвечает связанными событиями парковочных мест для `reservation-service`.

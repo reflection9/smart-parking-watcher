@@ -1,36 +1,36 @@
-# API Gateway, Balancing, and Rate Limiting
+# Шлюз API, балансировка и ограничение частоты запросов
 
-## Stack Choice
+## Выбор стека
 
-The project uses **Nginx** as a single infrastructure entry point in front of the Go microservices.
+В проекте используется `Nginx` как единая инфраструктурная точка входа перед Go-микросервисами.
 
-This gateway is responsible for:
+Этот шлюз отвечает за:
 
-- request routing to the correct service
-- basic load-balancer readiness through `upstream` groups
-- rate limiting for sensitive write endpoints
+- маршрутизацию запросов в нужный сервис
+- готовность к балансировке через `upstream`-группы
+- ограничение частоты запросов для чувствительных write-endpoint'ов
 
-## Public Entry Point
+## Внешняя точка входа
 
 - `http://localhost:8080`
 
-## Routed Prefixes
+## Префиксы маршрутов
 
 - `/users/*` -> `user-service`
-- `/zones/*` and `/spots/*` -> `parking-service`
+- `/zones/*` и `/spots/*` -> `parking-service`
 - `/subscriptions/*` -> `subscription-service`
 - `/reservations/*` -> `reservation-service`
-- `/history/*` and legacy `/events/*` -> `history-service`
+- `/history/*` и legacy `/events/*` -> `history-service`
 - `/notifications/*` -> `notification-service`
 
-## Rate-Limited Endpoints
+## Endpoint'ы с ограничением частоты
 
-- `POST /users/register` -> `5 requests / minute`
-- `POST /users/login` -> `10 requests / minute`
-- `POST /subscriptions` -> `20 requests / minute`
-- `POST /reservations` and reservation state transitions -> `15 requests / minute`
-- `POST /history/archive` -> `2 requests / minute`
+- `POST /users/register` -> `5 запросов / минута`
+- `POST /users/login` -> `10 запросов / минута`
+- `POST /subscriptions` -> `20 запросов / минута`
+- `POST /reservations` и переходы состояния брони -> `15 запросов / минута`
+- `POST /history/archive` -> `2 запроса / минута`
 
-## Balancing Model
+## Модель балансировки
 
-Each service is placed behind an Nginx `upstream` block. At the moment every upstream contains a single service instance, but the gateway is already prepared for horizontal scaling by adding more backend servers to the same upstream group.
+Каждый сервис расположен за `Nginx upstream`-блоком. Сейчас в каждом upstream находится один экземпляр сервиса, но gateway уже подготовлен к горизонтальному масштабированию: достаточно добавить новые backend-серверы в ту же upstream-группу.

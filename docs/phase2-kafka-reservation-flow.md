@@ -1,14 +1,14 @@
-# Kafka Reservation Flow
+# Поток Kafka для бронирования
 
 ## Цель
 
 Первая Kafka-итерация переводит жизненный цикл бронирования в событийную модель без отказа от существующего HTTP flow.
 
-## Topic
+## Топик
 
 - `reservation-lifecycle-events`
 
-## Producer
+## Производитель
 
 - `reservation-service`
 
@@ -19,13 +19,13 @@
 - `reservation.cancelled`
 - `reservation.expired`
 
-## Consumer
+## Потребитель
 
 - `history-service`
 
-Читает события из Kafka и сохраняет историю в MongoDB. Это делает `history-service` первым history/read-model сервисом во второй части архитектуры.
+Читает события из Kafka и сохраняет историю в MongoDB. Это делает `history-service` первым сервисом истории и read-model во второй части архитектуры.
 
-## Payload
+## Содержимое события
 
 Событие содержит:
 

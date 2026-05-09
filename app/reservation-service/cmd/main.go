@@ -9,6 +9,7 @@ import (
 	"reservation-service/internal/messaging"
 	"reservation-service/internal/repository"
 	"reservation-service/internal/service"
+	observability "smart-parking-observability"
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,6 +75,15 @@ func main() {
 		reservationTTLTracker,
 	)
 	reservationHandler := handler.NewReservationHandler(reservationService)
+	observer, err := observability.NewHTTPObserver(context.Background(), "reservation-service", cfg.OTLPEndpoint)
+	if err != nil {
+		log.Fatal("failed to initialize observability:", err)
+	}
+	defer func() {
+		if shutdownErr := observer.Shutdown(context.Background()); shutdownErr != nil {
+			log.Println("failed to shut down observability:", shutdownErr)
+		}
+	}()
 
 	go func() {
 		if err := spotEventConsumer.Start(context.Background(), reservationService); err != nil {
@@ -87,6 +97,7 @@ func main() {
 	}()
 
 	router := gin.Default()
+	observer.Attach(router)
 
 	router.POST("/reservations", reservationHandler.Create)
 	router.GET("/reservations/:id", reservationHandler.GetByID)

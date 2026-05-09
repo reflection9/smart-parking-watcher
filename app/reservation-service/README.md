@@ -1,8 +1,8 @@
 # reservation-service
 
-Reservation service for temporary parking spot bookings.
+Сервис временного бронирования парковочных мест.
 
-## Endpoints
+## Endpoint'ы
 
 - `POST /reservations`
 - `GET /reservations/:id`
@@ -11,12 +11,11 @@ Reservation service for temporary parking spot bookings.
 - `POST /reservations/:id/cancel`
 - `POST /reservations/:id/expire`
 
-## Notes
+## Примечания
 
-- The service stores reservations in PostgreSQL.
-- Reservation lifecycle is orchestrated through Kafka: creation, confirmation, cancellation, and expiration all publish commands that `parking-service` handles asynchronously.
-- User existence is validated through `user-service`.
-- Reservation lifecycle events are published to Kafka when the broker is configured.
-- Reservation TTL is stored in the reservation record through `expires_at` and mirrored in Redis for automatic expiration.
-- `POST /reservations/:id/expire` remains available for manual fallback and testing, but normal expiration can now happen automatically through Redis TTL.
-
+- Сервис хранит брони в `PostgreSQL`.
+- Жизненный цикл брони оркестрируется через Kafka: создание, подтверждение, отмена и истечение публикуют команды, которые `parking-service` обрабатывает асинхронно.
+- Существование пользователя проверяется через `user-service`.
+- События жизненного цикла брони публикуются в Kafka, если брокер настроен.
+- `TTL` брони хранится в записи через `expires_at` и дублируется в `Redis` для автоматического истечения.
+- `POST /reservations/:id/expire` остается доступным как ручной запасной вариант и для тестирования, но штатное истечение теперь может происходить автоматически через `Redis TTL`.

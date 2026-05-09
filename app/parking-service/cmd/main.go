@@ -8,6 +8,7 @@ import (
 	"parking-service/internal/messaging"
 	"parking-service/internal/repository"
 	"parking-service/internal/service"
+	observability "smart-parking-observability"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,6 +44,15 @@ func main() {
 
 	parkingService := service.NewParkingService(parkingRepo, eventPublisher)
 	parkingHandler := handler.NewParkingHandler(parkingService)
+	observer, err := observability.NewHTTPObserver(context.Background(), "parking-service", cfg.OTLPEndpoint)
+	if err != nil {
+		log.Fatal("failed to initialize observability:", err)
+	}
+	defer func() {
+		if shutdownErr := observer.Shutdown(context.Background()); shutdownErr != nil {
+			log.Println("failed to shut down observability:", shutdownErr)
+		}
+	}()
 
 	go func() {
 		if err := commandConsumer.Start(context.Background(), parkingService); err != nil {
@@ -51,6 +61,7 @@ func main() {
 	}()
 
 	router := gin.Default()
+	observer.Attach(router)
 
 	router.POST("/zones", parkingHandler.CreateZone)
 	router.GET("/zones", parkingHandler.ListZones)

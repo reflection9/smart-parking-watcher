@@ -1,16 +1,16 @@
 # subscription-service
 
-Minimal service for user subscriptions to parking zones.
+Сервис подписок пользователей на парковочные зоны.
 
-## Endpoints
+## Endpoint'ы
 
 - `POST /subscriptions`
 - `GET /subscriptions/users/:userId`
 - `GET /subscriptions/zones/:zoneId`
 - `DELETE /subscriptions/users/:userId/zones/:zoneId`
 
-## Notes
+## Примечания
 
-- Before creating a subscription, the service checks that the user exists in `user-service`.
-- It also checks that the parking zone exists in `parking-service`.
-- The subscriber list for a zone and the subscription list for a user are cached in Redis for hot reads.
+- Перед созданием подписки сервис проверяет существование пользователя в `user-service`.
+- Также сервис проверяет существование парковочной зоны в `parking-service`.
+- Список подписчиков зоны и список подписок пользователя кэшируются в `Redis` для быстрых чтений.

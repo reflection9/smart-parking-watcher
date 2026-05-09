@@ -12,6 +12,7 @@ import (
 
 type Config struct {
 	AppPort               string
+	OTLPEndpoint          string
 	MongoURI              string
 	MongoDBName           string
 	MongoCollection       string
@@ -38,6 +39,7 @@ func LoadConfig() *Config {
 
 	return &Config{
 		AppPort:               getEnv("APP_PORT", "8084"),
+		OTLPEndpoint:          getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
 		MongoURI:              getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		MongoDBName:           getEnv("MONGO_DB_NAME", "history_service_db"),
 		MongoCollection:       getEnv("MONGO_COLLECTION", "parking_events"),

@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	AppPort string
+	OTLPEndpoint string
 
 	DBHost     string
 	DBPort     string
@@ -45,6 +46,7 @@ func LoadConfig() *Config {
 
 	return &Config{
 		AppPort: getEnv("APP_PORT", "8085"),
+		OTLPEndpoint: getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
 
 		DBHost:     dbHost,
 		DBPort:     dbPort,

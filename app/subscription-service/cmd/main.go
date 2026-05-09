@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"subscription-service/internal/cache"
 	"subscription-service/internal/config"
 	"subscription-service/internal/handler"
 	"subscription-service/internal/repository"
 	"subscription-service/internal/service"
+	observability "smart-parking-observability"
 
 	"github.com/gin-gonic/gin"
 )
@@ -44,8 +46,18 @@ func main() {
 		subscriptionCache,
 	)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
+	observer, err := observability.NewHTTPObserver(context.Background(), "subscription-service", cfg.OTLPEndpoint)
+	if err != nil {
+		log.Fatal("failed to initialize observability:", err)
+	}
+	defer func() {
+		if shutdownErr := observer.Shutdown(context.Background()); shutdownErr != nil {
+			log.Println("failed to shut down observability:", shutdownErr)
+		}
+	}()
 
 	router := gin.Default()
+	observer.Attach(router)
 
 	router.POST("/subscriptions", subscriptionHandler.Create)
 	router.GET("/subscriptions/users/:userId", subscriptionHandler.ListByUserID)

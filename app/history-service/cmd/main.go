@@ -11,6 +11,7 @@ import (
 	"history-service/internal/messaging"
 	"history-service/internal/repository"
 	"history-service/internal/service"
+	observability "smart-parking-observability"
 
 	"github.com/gin-gonic/gin"
 )
@@ -51,6 +52,15 @@ func main() {
 		cfg.ArchiveBatchSize,
 	)
 	historyHandler := handler.NewHistoryHandler(historyService)
+	observer, err := observability.NewHTTPObserver(context.Background(), "history-service", cfg.OTLPEndpoint)
+	if err != nil {
+		log.Fatal("failed to initialize observability:", err)
+	}
+	defer func() {
+		if shutdownErr := observer.Shutdown(context.Background()); shutdownErr != nil {
+			log.Println("failed to shut down observability:", shutdownErr)
+		}
+	}()
 
 	reservationConsumer := messaging.NewNoopReservationEventConsumer()
 	spotConsumer := messaging.NewNoopSpotEventConsumer()
@@ -105,6 +115,7 @@ func main() {
 	}
 
 	router := gin.Default()
+	observer.Attach(router)
 
 	router.POST("/events", historyHandler.Create)
 	router.GET("/events/zones/:zoneId", historyHandler.ListByZoneID)

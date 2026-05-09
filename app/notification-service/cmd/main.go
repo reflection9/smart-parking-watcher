@@ -8,6 +8,7 @@ import (
 	"notification-service/internal/messaging"
 	"notification-service/internal/repository"
 	"notification-service/internal/service"
+	observability "smart-parking-observability"
 
 	"github.com/gin-gonic/gin"
 )
@@ -41,6 +42,15 @@ func main() {
 		emailSender,
 	)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
+	observer, err := observability.NewHTTPObserver(context.Background(), "notification-service", cfg.OTLPEndpoint)
+	if err != nil {
+		log.Fatal("failed to initialize observability:", err)
+	}
+	defer func() {
+		if shutdownErr := observer.Shutdown(context.Background()); shutdownErr != nil {
+			log.Println("failed to shut down observability:", shutdownErr)
+		}
+	}()
 
 	spotConsumer := messaging.NewNoopSpotEventConsumer()
 	if len(cfg.KafkaBrokers) > 0 {
@@ -62,6 +72,7 @@ func main() {
 	}()
 
 	router := gin.Default()
+	observer.Attach(router)
 
 	router.POST("/notifications/spot-freed", notificationHandler.DispatchSpotFreed)
 	router.GET("/notifications", notificationHandler.List)
