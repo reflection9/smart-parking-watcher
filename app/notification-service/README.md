@@ -1,18 +1,18 @@
 # notification-service
 
-Email notification service for users subscribed to parking zones.
+Сервис email-уведомлений для пользователей, подписанных на парковочные зоны.
 
-## Endpoints
+## Endpoint'ы
 
 - `POST /notifications/spot-freed`
 - `GET /notifications`
 - `GET /notifications/:id`
 
-## Notes
+## Примечания
 
-- The service stores notification history in PostgreSQL.
-- Duplicate notifications are blocked by the unique pair `event_id + user_id`.
-- Subscriber IDs are requested from `subscription-service` over HTTP.
-- Recipient emails are fetched from `user-service`.
-- When Kafka is configured, the service consumes `spot_freed` events directly from the broker.
-- If `EMAIL_TRANSPORT=log`, email delivery is logged instead of sent through SMTP.
+- Сервис хранит историю уведомлений в `PostgreSQL`.
+- Повторные уведомления блокируются уникальной парой `event_id + user_id`.
+- Идентификаторы подписчиков запрашиваются из `subscription-service` по HTTP.
+- Email-адреса получателей запрашиваются из `user-service`.
+- Когда Kafka настроена, сервис напрямую читает события `spot_freed` из брокера.
+- Если `EMAIL_TRANSPORT=log`, отправка писем логируется вместо реальной отправки через SMTP.
