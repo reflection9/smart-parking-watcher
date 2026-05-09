@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "3fa0f857-26c1-41bd-a0aa-9196d1c1e24e",
-    "name": "event-service",
+    "name": "history-service",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -31,16 +31,16 @@
       }
     },
     {
-      "name": "Получить события по зоне",
+      "name": "Получить историю по зоне",
       "request": {
         "method": "GET",
         "url": {
-          "raw": "{{baseUrl}}/events/zones/1",
+          "raw": "{{baseUrl}}/history/zones/1",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "events",
+            "history",
             "zones",
             "1"
           ]
@@ -48,16 +48,16 @@
       }
     },
     {
-      "name": "Получить события по месту",
+      "name": "Получить историю по месту",
       "request": {
         "method": "GET",
         "url": {
-          "raw": "{{baseUrl}}/events/spots/1",
+          "raw": "{{baseUrl}}/history/spots/1",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "events",
+            "history",
             "spots",
             "1"
           ]
@@ -65,18 +65,40 @@
       }
     },
     {
-      "name": "Получить события по брони",
+      "name": "Получить историю по брони",
       "request": {
         "method": "GET",
         "url": {
-          "raw": "{{baseUrl}}/events/reservations/1",
+          "raw": "{{baseUrl}}/history/reservations/1",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "events",
+            "history",
             "reservations",
             "1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Архивировать старые события",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/history/archive?older_than_hours=0",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "history",
+            "archive"
+          ],
+          "query": [
+            {
+              "key": "older_than_hours",
+              "value": "0"
+            }
           ]
         }
       }

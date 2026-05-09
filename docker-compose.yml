@@ -30,6 +30,24 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: smart-parking-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     container_name: smart-parking-redis
@@ -280,28 +298,38 @@ services:
       - "8086:8086"
     restart: unless-stopped
 
-  event-service:
+  history-service:
     build:
       context: .
       dockerfile: infra/docker/go-service.Dockerfile
       args:
-        SERVICE_NAME: event-service
-    container_name: smart-parking-event-service
+        SERVICE_NAME: history-service
+    container_name: smart-parking-history-service
     depends_on:
       mongo:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
       APP_PORT: 8084
       MONGO_URI: mongodb://mongo:27017
-      MONGO_DB_NAME: event_service_db
+      MONGO_DB_NAME: history_service_db
       MONGO_COLLECTION: parking_events
       KAFKA_BROKERS: kafka:9092
       KAFKA_RESERVATION_TOPIC: reservation-lifecycle-events
-      KAFKA_RESERVATION_GROUP_ID: event-service-reservations
+      KAFKA_RESERVATION_GROUP_ID: history-service-reservations
       KAFKA_SPOT_TOPIC: spot-status-events
-      KAFKA_SPOT_GROUP_ID: event-service-spots
+      KAFKA_SPOT_GROUP_ID: history-service-spots
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: history-archives
+      MINIO_USE_SSL: "false"
+      ARCHIVE_AFTER_HOURS: 720
+      ARCHIVE_INTERVAL_SECONDS: 300
+      ARCHIVE_BATCH_SIZE: 500
     ports:
       - "8084:8084"
     restart: unless-stopped
@@ -345,3 +373,4 @@ services:
 volumes:
   postgres_data:
   mongo_data:
+  minio_data:
