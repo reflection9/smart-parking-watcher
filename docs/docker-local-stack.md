@@ -2,6 +2,7 @@
 
 ## What Starts
 
+- API Gateway (Nginx)
 - PostgreSQL
 - MongoDB
 - Redis
@@ -25,6 +26,7 @@ docker compose up --build
 
 ## Exposed Ports
 
+- `8080` - API Gateway
 - `8081` - `user-service`
 - `8082` - `subscription-service`
 - `8083` - `parking-service`
@@ -41,6 +43,9 @@ docker compose up --build
 
 ## Notes
 
+- The preferred entry point for the application API is `http://localhost:8080`.
+- Nginx routes requests to the internal services and applies rate limiting to sensitive endpoints.
+- Upstream blocks are prepared for balancing, so the gateway can fan out to multiple service replicas later without changing client URLs.
 - Inside Docker, services use Kafka at `kafka:9092`.
 - From the host machine, Kafka is available at `localhost:9094`.
 - Redis is used by `reservation-service` for reservation TTL and automatic expiration.
