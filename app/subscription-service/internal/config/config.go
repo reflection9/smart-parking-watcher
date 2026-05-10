@@ -11,20 +11,21 @@ import (
 )
 
 type Config struct {
-	AppPort           string
-	DBHost            string
-	DBPort            string
-	DBUser            string
-	DBPassword        string
-	DBName            string
-	OTLPEndpoint      string
-	UserServiceURL    string
-	ParkingServiceURL string
-	RedisAddr         string
-	RedisPassword     string
-	RedisDB           int
-	RedisKeyPrefix    string
-	RedisCacheTTL     time.Duration
+	AppPort                string
+	DBHost                 string
+	DBPort                 string
+	DBUser                 string
+	DBPassword             string
+	DBName                 string
+	OTLPEndpoint           string
+	UserServiceURL         string
+	ParkingServiceURL      string
+	NotificationServiceURL string
+	RedisAddr              string
+	RedisPassword          string
+	RedisDB                int
+	RedisKeyPrefix         string
+	RedisCacheTTL          time.Duration
 }
 
 func LoadConfig() *Config {
@@ -34,20 +35,21 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		AppPort:           getEnv("APP_PORT", "8082"),
-		DBHost:            getEnv("DB_HOST", "localhost"),
-		DBPort:            getEnv("DB_PORT", "5432"),
-		DBUser:            getEnv("DB_USER", "postgres"),
-		DBPassword:        getEnv("DB_PASSWORD", "postgres"),
-		DBName:            getEnv("DB_NAME", "subscription_service_db"),
-		OTLPEndpoint:      getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
-		UserServiceURL:    getEnv("USER_SERVICE_URL", "http://localhost:8081"),
-		ParkingServiceURL: getEnv("PARKING_SERVICE_URL", "http://localhost:8083"),
-		RedisAddr:         getEnv("REDIS_ADDR", ""),
-		RedisPassword:     getEnv("REDIS_PASSWORD", ""),
-		RedisDB:           getEnvAsInt("REDIS_DB", 0),
-		RedisKeyPrefix:    getEnv("REDIS_KEY_PREFIX", "subscription_cache:"),
-		RedisCacheTTL:     time.Duration(getEnvAsInt("REDIS_CACHE_TTL_SECONDS", 60)) * time.Second,
+		AppPort:                getEnv("APP_PORT", "8082"),
+		DBHost:                 getEnv("DB_HOST", "localhost"),
+		DBPort:                 getEnv("DB_PORT", "5432"),
+		DBUser:                 getEnv("DB_USER", "postgres"),
+		DBPassword:             getEnv("DB_PASSWORD", "postgres"),
+		DBName:                 getEnv("DB_NAME", "subscription_service_db"),
+		OTLPEndpoint:           getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""),
+		UserServiceURL:         getEnv("USER_SERVICE_URL", "http://localhost:8081"),
+		ParkingServiceURL:      getEnv("PARKING_SERVICE_URL", "http://localhost:8083"),
+		NotificationServiceURL: getEnv("NOTIFICATION_SERVICE_URL", "http://localhost:8085"),
+		RedisAddr:              getEnv("REDIS_ADDR", ""),
+		RedisPassword:          getEnv("REDIS_PASSWORD", ""),
+		RedisDB:                getEnvAsInt("REDIS_DB", 0),
+		RedisKeyPrefix:         getEnv("REDIS_KEY_PREFIX", "subscription_cache:"),
+		RedisCacheTTL:          time.Duration(getEnvAsInt("REDIS_CACHE_TTL_SECONDS", 60)) * time.Second,
 	}
 }
 

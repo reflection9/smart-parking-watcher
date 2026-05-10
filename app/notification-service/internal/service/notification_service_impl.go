@@ -39,14 +39,18 @@ func (s *notificationService) DispatchSpotFreed(
 	ctx context.Context,
 	req dto.DispatchNotificationRequest,
 ) (*dto.DispatchNotificationResponse, error) {
-	if !strings.EqualFold(req.EventType, "spot_freed") {
+	if !isSupportedNotificationEventType(req.EventType) {
 		return nil, ErrInvalidEventType
 	}
 
 	eventType := strings.ToLower(req.EventType)
-	userIDs, err := s.subscriptionLookupClient.ListUserIDsByZoneID(ctx, req.ZoneID)
-	if err != nil {
-		return nil, err
+	userIDs := req.UserIDs
+	if len(userIDs) == 0 {
+		var err error
+		userIDs, err = s.subscriptionLookupClient.ListUserIDsByZoneID(ctx, req.ZoneID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	response := &dto.DispatchNotificationResponse{
@@ -190,7 +194,10 @@ func newPendingNotification(
 ) *model.Notification {
 	now := time.Now()
 	subject := fmt.Sprintf("Parking spot available in zone #%d", req.ZoneID)
-	body := fmt.Sprintf("A parking spot has been freed in zone #%d.", req.ZoneID)
+	body := fmt.Sprintf("A parking spot is available in zone #%d.", req.ZoneID)
+	if strings.EqualFold(eventType, "spot_freed") {
+		body = fmt.Sprintf("A parking spot has been freed in zone #%d.", req.ZoneID)
+	}
 	if req.SpotID != nil {
 		body = fmt.Sprintf("%s Spot ID: %d.", body, *req.SpotID)
 	}
@@ -208,6 +215,15 @@ func newPendingNotification(
 		Status:         model.NotificationStatusPending,
 		CreatedAt:      now,
 		UpdatedAt:      now,
+	}
+}
+
+func isSupportedNotificationEventType(eventType string) bool {
+	switch strings.ToLower(strings.TrimSpace(eventType)) {
+	case "spot_freed", "spot_available":
+		return true
+	default:
+		return false
 	}
 }
 

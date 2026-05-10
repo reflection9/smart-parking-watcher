@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"log"
+	observability "smart-parking-observability"
 	"subscription-service/internal/cache"
 	"subscription-service/internal/config"
 	"subscription-service/internal/handler"
 	"subscription-service/internal/repository"
 	"subscription-service/internal/service"
-	observability "smart-parking-observability"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,6 +20,7 @@ func main() {
 	subscriptionRepo := repository.NewGormSubscriptionRepository(db)
 	userLookupClient := service.NewHTTPUserLookupClient(cfg.UserServiceURL)
 	zoneLookupClient := service.NewHTTPZoneLookupClient(cfg.ParkingServiceURL)
+	notificationDispatchClient := service.NewHTTPNotificationDispatchClient(cfg.NotificationServiceURL)
 	subscriptionCache := cache.NewNoopSubscriptionCache()
 	if cfg.RedisAddr != "" {
 		subscriptionCache = cache.NewRedisSubscriptionCache(
@@ -43,6 +44,7 @@ func main() {
 		subscriptionRepo,
 		userLookupClient,
 		zoneLookupClient,
+		notificationDispatchClient,
 		subscriptionCache,
 	)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
