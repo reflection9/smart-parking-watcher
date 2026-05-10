@@ -14,27 +14,34 @@ import (
 )
 
 type subscriptionService struct {
-	subscriptionRepo  repository.SubscriptionRepository
-	userLookupClient  UserLookupClient
-	zoneLookupClient  ZoneLookupClient
-	subscriptionCache cache.SubscriptionCache
+	subscriptionRepo           repository.SubscriptionRepository
+	userLookupClient           UserLookupClient
+	zoneLookupClient           ZoneLookupClient
+	notificationDispatchClient NotificationDispatchClient
+	subscriptionCache          cache.SubscriptionCache
 }
 
 func NewSubscriptionService(
 	subscriptionRepo repository.SubscriptionRepository,
 	userLookupClient UserLookupClient,
 	zoneLookupClient ZoneLookupClient,
+	notificationDispatchClient NotificationDispatchClient,
 	subscriptionCache cache.SubscriptionCache,
 ) SubscriptionService {
 	if subscriptionCache == nil {
 		subscriptionCache = cache.NewNoopSubscriptionCache()
 	}
 
+	if notificationDispatchClient == nil {
+		notificationDispatchClient = noopNotificationDispatchClient{}
+	}
+
 	return &subscriptionService{
-		subscriptionRepo:  subscriptionRepo,
-		userLookupClient:  userLookupClient,
-		zoneLookupClient:  zoneLookupClient,
-		subscriptionCache: subscriptionCache,
+		subscriptionRepo:           subscriptionRepo,
+		userLookupClient:           userLookupClient,
+		zoneLookupClient:           zoneLookupClient,
+		notificationDispatchClient: notificationDispatchClient,
+		subscriptionCache:          subscriptionCache,
 	}
 }
 
@@ -47,11 +54,11 @@ func (s *subscriptionService) Create(ctx context.Context, req dto.CreateSubscrip
 		return nil, ErrUserNotFound
 	}
 
-	zoneExists, err := s.zoneLookupClient.Exists(ctx, req.ZoneID)
+	zone, err := s.zoneLookupClient.GetByID(ctx, req.ZoneID)
 	if err != nil {
 		return nil, ErrDependencyUnavailable
 	}
-	if !zoneExists {
+	if zone == nil {
 		return nil, ErrZoneNotFound
 	}
 
@@ -77,6 +84,7 @@ func (s *subscriptionService) Create(ctx context.Context, req dto.CreateSubscrip
 
 	s.invalidateZoneCache(ctx, subscription.ZoneID)
 	s.invalidateUserCache(ctx, subscription.UserID)
+	s.dispatchCurrentAvailabilityNotification(ctx, subscription.UserID, zone)
 
 	return &dto.SubscriptionResponse{
 		ID:        subscription.ID,
@@ -84,6 +92,25 @@ func (s *subscriptionService) Create(ctx context.Context, req dto.CreateSubscrip
 		ZoneID:    subscription.ZoneID,
 		CreatedAt: subscription.CreatedAt,
 	}, nil
+}
+
+func (s *subscriptionService) dispatchCurrentAvailabilityNotification(
+	ctx context.Context,
+	userID int64,
+	zone *ZoneDetails,
+) {
+	if zone == nil || zone.AvailableSpots <= 0 {
+		return
+	}
+
+	if err := s.notificationDispatchClient.NotifyCurrentAvailability(ctx, userID, zone); err != nil {
+		log.Printf(
+			"failed to send immediate availability notification for user %d and zone %d: %v",
+			userID,
+			zone.ID,
+			err,
+		)
+	}
 }
 
 func (s *subscriptionService) ListByUserID(ctx context.Context, userID int64) ([]dto.SubscriptionResponse, error) {

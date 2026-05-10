@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4ecdf" />
+    <title>SmartParkingWatcher Atlas</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-wash page-wash-left"></div>
+    <div class="page-wash page-wash-right"></div>
+    <div id="toast-stack" class="toast-stack"></div>
+
+    <main class="page-shell">
+      <header class="hero">
+        <section class="hero-copy">
+          <p class="eyebrow">smart parking watcher</p>
+          <h1>Сайт-пульт, где парковка выглядит как живая карта города, а не как стопка скучных форм.</h1>
+          <p class="hero-text">
+            Здесь мы руками проигрываем все сценарии системы: создаем пользователей, рисуем зоны,
+            двигаем статусы мест, создаем подписки, запускаем бронь, смотрим историю и проверяем
+            уведомления через один красивый входной экран.
+          </p>
+
+          <div class="hero-actions">
+            <button id="refresh-dashboard-button" class="button button-primary" type="button">Обновить карту</button>
+            <button id="demo-seed-button" class="button button-secondary" type="button">Запустить демо-сценарий</button>
+            <button id="notifications-fetch-button" class="button button-soft" type="button">Подтянуть уведомления</button>
+          </div>
+
+          <div class="link-row">
+            <a href="/" class="inline-link active">Atlas</a>
+            <a href="http://localhost:3000" class="inline-link" target="_blank" rel="noreferrer">Grafana</a>
+            <a href="http://localhost:16686" class="inline-link" target="_blank" rel="noreferrer">Jaeger</a>
+            <a href="http://localhost:8088" class="inline-link" target="_blank" rel="noreferrer">Kafka UI</a>
+            <a href="http://localhost:9001" class="inline-link" target="_blank" rel="noreferrer">MinIO</a>
+          </div>
+        </section>
+
+        <aside class="hero-summary">
+          <div class="summary-head">
+            <span class="summary-chip">текущее состояние</span>
+            <span id="last-sync-label" class="summary-meta">еще не синхронизировано</span>
+          </div>
+
+          <div class="metrics-grid">
+            <article class="metric-card accent-sand">
+              <span>Зон в карте</span>
+              <strong id="zones-count">0</strong>
+            </article>
+            <article class="metric-card accent-teal">
+              <span>Свободных мест</span>
+              <strong id="available-spots-count">0</strong>
+            </article>
+            <article class="metric-card accent-coral">
+              <span>Уведомлений</span>
+              <strong id="notifications-count">0</strong>
+            </article>
+            <article class="metric-card accent-ink">
+              <span>Статус брони</span>
+              <strong id="current-reservation-status">нет</strong>
+            </article>
+          </div>
+
+          <div class="context-card">
+            <div class="context-line"><span>user_id</span><strong data-display="userId">-</strong></div>
+            <div class="context-line"><span>zone_id</span><strong data-display="zoneId">-</strong></div>
+            <div class="context-line"><span>spot_id</span><strong data-display="spotId">-</strong></div>
+            <div class="context-line"><span>reservation_id</span><strong data-display="reservationId">-</strong></div>
+          </div>
+
+          <p class="helper-note">
+            SMTP-параметры теперь вынесены в корневой <code>.env</code>. Достаточно заполнить
+            <code>NOTIFICATION_SMTP_*</code> и переключить <code>NOTIFICATION_EMAIL_TRANSPORT=smtp</code>.
+          </p>
+        </aside>
+      </header>
+
+      <section class="selection-strip">
+        <article class="selection-pill">
+          <span>Пользователь</span>
+          <strong data-display="userId">-</strong>
+        </article>
+        <article class="selection-pill">
+          <span>Зона</span>
+          <strong data-display="zoneId">-</strong>
+        </article>
+        <article class="selection-pill">
+          <span>Место</span>
+          <strong data-display="spotId">-</strong>
+        </article>
+        <article class="selection-pill wide">
+          <span>Бронь и сага</span>
+          <strong data-display="reservationStatus">-</strong>
+        </article>
+      </section>
+
+      <section id="atlas-section" class="section-card atlas-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">карта зон</p>
+            <h2>Парковочные зоны как интерактивные ячейки</h2>
+          </div>
+          <div class="section-actions">
+            <button id="fetch-zones-button" class="button button-secondary" type="button">Загрузить зоны</button>
+            <button id="expand-zones-button" class="button button-soft" type="button">Развернуть карту</button>
+          </div>
+        </div>
+
+        <div class="atlas-layout">
+          <div id="zones-grid" class="zones-grid">
+            <article class="empty-card">
+              <h3>Карта пока пустая</h3>
+              <p>Создай зону или нажми «Загрузить зоны», и мы соберем живой атлас поверх parking-service.</p>
+            </article>
+          </div>
+
+          <aside class="atlas-sidebar">
+            <article class="side-card">
+              <div class="mini-head">
+                <h3>Легенда</h3>
+              </div>
+              <div class="legend-list">
+                <div class="legend-item"><span class="legend-swatch free"></span><span>FREE — место свободно</span></div>
+                <div class="legend-item"><span class="legend-swatch reserved"></span><span>RESERVED — место удерживается бронью</span></div>
+                <div class="legend-item"><span class="legend-swatch occupied"></span><span>OCCUPIED — место занято, показываем машину</span></div>
+              </div>
+            </article>
+
+            <article class="side-card">
+              <div class="mini-head">
+                <h3>Выбранный контекст</h3>
+              </div>
+              <div id="selection-summary" class="selection-summary">
+                <p>Выбери зону или место прямо на карте, и мы автоматически подставим id в формы справа.</p>
+              </div>
+            </article>
+
+            <article class="side-card">
+              <div class="mini-head">
+                <h3>Последние уведомления</h3>
+                <button id="notifications-preview-refresh" class="tiny-link" type="button">обновить</button>
+              </div>
+              <div id="notifications-preview" class="preview-stack">
+                <div class="preview-empty">Здесь будут последние уведомления по событиям и подпискам.</div>
+              </div>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section-card studio-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">endpoint studio</p>
+            <h2>Полный ручной сценарий по всем сервисам</h2>
+          </div>
+          <p class="section-note">
+            Формы ниже покрывают все основные операции ваших ручек: создание, чтение, переходы состояний,
+            историю, архивацию и ручную отправку уведомлений.
+          </p>
+        </div>
+
+        <div class="studio-layout">
+          <div class="service-stack">
+            <details class="service-panel" open>
+              <summary>
+                <span class="service-chip">user-service</span>
+                <strong>Пользователи и вход</strong>
+              </summary>
+              <div class="operations-grid">
+                <form id="user-register-form" class="operation-card">
+                  <h3>POST /users/register</h3>
+                  <label><span>Имя</span><input name="name" placeholder="Вечерний водитель" required /></label>
+                  <label><span>Email</span><input name="email" type="email" placeholder="driver@example.com" required /></label>
+                  <label><span>Пароль</span><input name="password" type="password" value="password123" required /></label>
+                  <button class="button button-primary" type="submit">Создать пользователя</button>
+                </form>
+
+                <form id="user-login-form" class="operation-card">
+                  <h3>POST /users/login</h3>
+                  <label><span>Email</span><input name="email" type="email" placeholder="driver@example.com" required /></label>
+                  <label><span>Пароль</span><input name="password" type="password" value="password123" required /></label>
+                  <button class="button button-secondary" type="submit">Войти</button>
+                </form>
+
+                <form id="user-get-form" class="operation-card">
+                  <h3>GET /users/:id</h3>
+                  <label><span>User ID</span><input name="user_id" type="number" data-prefill="userId" placeholder="1" required /></label>
+                  <button class="button button-soft" type="submit">Получить пользователя</button>
+                </form>
+              </div>
+            </details>
+
+            <details class="service-panel" open>
+              <summary>
+                <span class="service-chip">parking-service</span>
+                <strong>Зоны, места и статусы</strong>
+              </summary>
+              <div class="operations-grid">
+                <form id="zone-create-form" class="operation-card">
+                  <h3>POST /zones</h3>
+                  <label><span>Название зоны</span><input name="name" placeholder="Садовая терраса" required /></label>
+                  <button class="button button-primary" type="submit">Создать зону</button>
+                </form>
+
+                <form id="zone-get-form" class="operation-card">
+                  <h3>GET /zones/:id</h3>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <div class="button-row">
+                    <button class="button button-secondary" type="submit">Получить зону</button>
+                    <button id="zone-list-button" class="button button-soft" type="button">GET /zones</button>
+                  </div>
+                </form>
+
+                <form id="spot-create-form" class="operation-card">
+                  <h3>POST /zones/:zoneId/spots</h3>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <label><span>Номер места</span><input name="number" placeholder="A-01" required /></label>
+                  <label>
+                    <span>Стартовый статус</span>
+                    <select name="status">
+                      <option value="FREE">FREE</option>
+                      <option value="RESERVED">RESERVED</option>
+                      <option value="OCCUPIED">OCCUPIED</option>
+                    </select>
+                  </label>
+                  <button class="button button-primary" type="submit">Добавить место</button>
+                </form>
+
+                <form id="spot-get-form" class="operation-card">
+                  <h3>GET /spots/:spotId/zones/:zoneId</h3>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <label><span>Spot ID</span><input name="spot_id" type="number" data-prefill="spotId" placeholder="1" required /></label>
+                  <button class="button button-secondary" type="submit">Получить место</button>
+                </form>
+
+                <form id="spot-status-form" class="operation-card">
+                  <h3>PATCH /zones/:zoneId/spots/:spotId/status</h3>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <label><span>Spot ID</span><input name="spot_id" type="number" data-prefill="spotId" placeholder="1" required /></label>
+                  <label>
+                    <span>Новый статус</span>
+                    <select name="status">
+                      <option value="FREE">FREE</option>
+                      <option value="RESERVED">RESERVED</option>
+                      <option value="OCCUPIED">OCCUPIED</option>
+                    </select>
+                  </label>
+                  <button class="button button-soft" type="submit">Обновить статус</button>
+                </form>
+
+                <form id="spot-transition-form" class="operation-card">
+                  <h3>POST reserve / release / occupy</h3>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <label><span>Spot ID</span><input name="spot_id" type="number" data-prefill="spotId" placeholder="1" required /></label>
+                  <div class="button-row">
+                    <button class="button button-secondary" type="button" data-transition="reserve">reserve</button>
+                    <button class="button button-soft" type="button" data-transition="release">release</button>
+                    <button class="button button-primary" type="button" data-transition="occupy">occupy</button>
+                  </div>
+                </form>
+              </div>
+            </details>
+
+            <details class="service-panel" open>
+              <summary>
+                <span class="service-chip">subscription-service</span>
+                <strong>Подписки и отписка</strong>
+              </summary>
+              <div class="operations-grid">
+                <form id="subscription-create-form" class="operation-card">
+                  <h3>POST /subscriptions</h3>
+                  <label><span>User ID</span><input name="user_id" type="number" data-prefill="userId" placeholder="1" required /></label>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <button class="button button-primary" type="submit">Подписать на зону</button>
+                </form>
+
+                <form id="subscription-list-user-form" class="operation-card">
+                  <h3>GET /subscriptions/users/:userId</h3>
+                  <label><span>User ID</span><input name="user_id" type="number" data-prefill="userId" placeholder="1" required /></label>
+                  <button class="button button-secondary" type="submit">Список подписок пользователя</button>
+                </form>
+
+                <form id="subscription-list-zone-form" class="operation-card">
+                  <h3>GET /subscriptions/zones/:zoneId</h3>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <button class="button button-soft" type="submit">Список подписчиков зоны</button>
+                </form>
+
+                <form id="subscription-delete-form" class="operation-card">
+                  <h3>DELETE /subscriptions/users/:userId/zones/:zoneId</h3>
+                  <label><span>User ID</span><input name="user_id" type="number" data-prefill="userId" placeholder="1" required /></label>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <button class="button button-danger" type="submit">Отписать пользователя</button>
+                </form>
+              </div>
+            </details>
+
+            <details class="service-panel" open>
+              <summary>
+                <span class="service-chip">reservation-service</span>
+                <strong>Бронь и переходы саги</strong>
+              </summary>
+              <div class="operations-grid">
+                <form id="reservation-create-form" class="operation-card">
+                  <h3>POST /reservations</h3>
+                  <label><span>User ID</span><input name="user_id" type="number" data-prefill="userId" placeholder="1" required /></label>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <label><span>Spot ID</span><input name="spot_id" type="number" data-prefill="spotId" placeholder="1" required /></label>
+                  <button class="button button-primary" type="submit">Создать бронь</button>
+                </form>
+
+                <form id="reservation-get-form" class="operation-card">
+                  <h3>GET /reservations/:id</h3>
+                  <label><span>Reservation ID</span><input name="reservation_id" type="number" data-prefill="reservationId" placeholder="1" required /></label>
+                  <button class="button button-secondary" type="submit">Получить бронь</button>
+                </form>
+
+                <form id="reservation-list-user-form" class="operation-card">
+                  <h3>GET /reservations/users/:userId</h3>
+                  <label><span>User ID</span><input name="user_id" type="number" data-prefill="userId" placeholder="1" required /></label>
+                  <button class="button button-soft" type="submit">Список броней пользователя</button>
+                </form>
+
+                <form id="reservation-action-form" class="operation-card">
+                  <h3>POST confirm / cancel / expire</h3>
+                  <label><span>Reservation ID</span><input name="reservation_id" type="number" data-prefill="reservationId" placeholder="1" required /></label>
+                  <div class="button-row">
+                    <button class="button button-primary" type="button" data-reservation-action="confirm">confirm</button>
+                    <button class="button button-secondary" type="button" data-reservation-action="cancel">cancel</button>
+                    <button class="button button-danger" type="button" data-reservation-action="expire">expire</button>
+                  </div>
+                </form>
+              </div>
+            </details>
+
+            <details class="service-panel" open>
+              <summary>
+                <span class="service-chip">history-service</span>
+                <strong>История и холодный архив</strong>
+              </summary>
+              <div class="operations-grid">
+                <form id="history-create-form" class="operation-card">
+                  <h3>POST /history/events</h3>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <label><span>Spot ID</span><input name="spot_id" type="number" data-prefill="spotId" placeholder="1" required /></label>
+                  <label><span>Event type</span><input name="event_type" value="manual_override" required /></label>
+                  <label><span>Old status</span><input name="old_status" placeholder="FREE" /></label>
+                  <label><span>New status</span><input name="new_status" value="OCCUPIED" required /></label>
+                  <label><span>Source</span><input name="source" value="ui-manual" /></label>
+                  <button class="button button-primary" type="submit">Создать событие</button>
+                </form>
+
+                <form id="history-zone-form" class="operation-card">
+                  <h3>GET /history/zones/:zoneId</h3>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <button class="button button-secondary" type="submit">История зоны</button>
+                </form>
+
+                <form id="history-spot-form" class="operation-card">
+                  <h3>GET /history/spots/:spotId</h3>
+                  <label><span>Spot ID</span><input name="spot_id" type="number" data-prefill="spotId" placeholder="1" required /></label>
+                  <button class="button button-soft" type="submit">История места</button>
+                </form>
+
+                <form id="history-reservation-form" class="operation-card">
+                  <h3>GET /history/reservations/:reservationId</h3>
+                  <label><span>Reservation ID</span><input name="reservation_id" type="number" data-prefill="reservationId" placeholder="1" required /></label>
+                  <button class="button button-secondary" type="submit">История брони</button>
+                </form>
+
+                <form id="history-archive-form" class="operation-card">
+                  <h3>POST /history/archive</h3>
+                  <label><span>older_than_hours</span><input name="older_than_hours" type="number" value="24" min="0" required /></label>
+                  <button class="button button-danger" type="submit">Отправить старые события в MinIO</button>
+                </form>
+              </div>
+            </details>
+
+            <details class="service-panel" open>
+              <summary>
+                <span class="service-chip">notification-service</span>
+                <strong>Уведомления и ручной dispatch</strong>
+              </summary>
+              <div class="operations-grid">
+                <form id="notification-dispatch-form" class="operation-card">
+                  <h3>POST /notifications/spot-freed</h3>
+                  <label><span>Event ID</span><input name="event_id" value="manual-ui-event" required /></label>
+                  <label><span>Event type</span><input name="event_type" value="spot_freed" required /></label>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" required /></label>
+                  <label><span>Spot ID</span><input name="spot_id" type="number" data-prefill="spotId" placeholder="1" /></label>
+                  <label><span>User IDs через запятую</span><input name="user_ids" data-prefill="userId" placeholder="1,2,3" /></label>
+                  <button class="button button-primary" type="submit">Отправить вручную</button>
+                </form>
+
+                <form id="notification-list-form" class="operation-card">
+                  <h3>GET /notifications</h3>
+                  <label><span>User ID</span><input name="user_id" type="number" data-prefill="userId" placeholder="1" /></label>
+                  <label><span>Zone ID</span><input name="zone_id" type="number" data-prefill="zoneId" placeholder="1" /></label>
+                  <label><span>Event ID</span><input name="event_id" placeholder="manual-ui-event" /></label>
+                  <label>
+                    <span>Status</span>
+                    <select name="status">
+                      <option value="">любой</option>
+                      <option value="pending">pending</option>
+                      <option value="sent">sent</option>
+                      <option value="failed">failed</option>
+                    </select>
+                  </label>
+                  <label><span>Limit</span><input name="limit" type="number" value="20" min="1" /></label>
+                  <button class="button button-secondary" type="submit">Список уведомлений</button>
+                </form>
+
+                <form id="notification-get-form" class="operation-card">
+                  <h3>GET /notifications/:id</h3>
+                  <label><span>Notification ID</span><input name="notification_id" type="number" placeholder="1" required /></label>
+                  <button class="button button-soft" type="submit">Получить уведомление</button>
+                </form>
+              </div>
+            </details>
+          </div>
+
+          <aside class="results-column">
+            <article class="result-card">
+              <div class="mini-head">
+                <h3>Последний ответ API</h3>
+              </div>
+              <pre id="payload-viewer" class="payload-viewer">Сделай любой запрос, и здесь появится живой JSON.</pre>
+            </article>
+
+            <article class="result-card">
+              <div class="mini-head">
+                <h3>Журнал действий</h3>
+                <button id="clear-log-button" class="tiny-link" type="button">очистить</button>
+              </div>
+              <div id="event-log" class="event-log">
+                <div class="preview-empty">Лента действий начнет заполняться после первого запроса.</div>
+              </div>
+            </article>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
