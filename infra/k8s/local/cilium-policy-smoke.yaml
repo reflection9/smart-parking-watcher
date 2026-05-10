@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spw-smoke
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-server
+  namespace: spw-smoke
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: echo-server
+  template:
+    metadata:
+      labels:
+        app: echo-server
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-server
+  namespace: spw-smoke
+spec:
+  selector:
+    app: echo-server
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-allowed
+  namespace: spw-smoke
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: client-allowed
+  template:
+    metadata:
+      labels:
+        app: client-allowed
+    spec:
+      containers:
+        - name: curl
+          image: curlimages/curl:8.10.1
+          command: ["sh", "-c", "sleep 3600"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: client-blocked
+  namespace: spw-smoke
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: client-blocked
+  template:
+    metadata:
+      labels:
+        app: client-blocked
+    spec:
+      containers:
+        - name: curl
+          image: curlimages/curl:8.10.1
+          command: ["sh", "-c", "sleep 3600"]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-echo-only-from-allowed-client
+  namespace: spw-smoke
+spec:
+  endpointSelector:
+    matchLabels:
+      app: echo-server
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app: client-allowed
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP

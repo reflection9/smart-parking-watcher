@@ -1,0 +1,41 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: spw-local
+servers: 1
+agents: 2
+kubeAPI:
+  host: "127.0.0.1"
+  hostIP: "127.0.0.1"
+  hostPort: "6550"
+ports:
+  - port: "8080:80"
+    nodeFilters:
+      - loadbalancer
+  - port: "8443:443"
+    nodeFilters:
+      - loadbalancer
+registries:
+  create:
+    name: spw-registry
+    host: "0.0.0.0"
+    hostPort: "5001"
+options:
+  k3d:
+    wait: true
+    timeout: "180s"
+    disableLoadbalancer: false
+  k3s:
+    extraArgs:
+      - arg: "--flannel-backend=none"
+        nodeFilters:
+          - server:*
+      - arg: "--disable-network-policy"
+        nodeFilters:
+          - server:*
+      - arg: "--disable=traefik"
+        nodeFilters:
+          - server:*
+      - arg: "--disable=servicelb"
+        nodeFilters:
+          - server:*
