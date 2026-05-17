@@ -1,0 +1,49 @@
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: dual-role
+  namespace: {{ kafka_namespace }}
+  labels:
+    strimzi.io/cluster: {{ kafka_cluster_name }}
+spec:
+  replicas: {{ kafka_replicas }}
+  roles:
+    - broker
+    - controller
+  storage:
+{% if kafka_storage_class | length > 0 %}
+    type: persistent-claim
+    class: {{ kafka_storage_class }}
+    size: {{ kafka_storage_size }}
+    deleteClaim: false
+{% else %}
+    type: ephemeral
+{% endif %}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: {{ kafka_cluster_name }}
+  namespace: {{ kafka_namespace }}
+  annotations:
+    strimzi.io/node-pools: enabled
+    strimzi.io/kraft: enabled
+spec:
+  kafka:
+    version: {{ kafka_version }}
+    metadataVersion: {{ kafka_metadata_version }}
+    listeners:
+      - name: {{ kafka_plain_listener_name }}
+        port: {{ kafka_plain_listener_port }}
+        type: internal
+        tls: {{ kafka_plain_listener_tls | lower }}
+    config:
+      auto.create.topics.enable: true
+      default.replication.factor: 1
+      min.insync.replicas: 1
+      offsets.topic.replication.factor: 1
+      transaction.state.log.min.isr: 1
+      transaction.state.log.replication.factor: 1
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}
