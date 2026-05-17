@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: reservation-service
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: reservation-service
+    app.kubernetes.io/component: backend
+spec:
+  ports:
+    - name: http
+      port: 8086
+      targetPort: 8086
+  selector:
+    app.kubernetes.io/name: reservation-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reservation-service
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: reservation-service
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: reservation-service
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8086"
+      labels:
+        app.kubernetes.io/name: reservation-service
+        app.kubernetes.io/component: backend
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done"]
+        - name: wait-for-redis
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z redis 6379; do echo waiting for redis; sleep 2; done"]
+        - name: wait-for-kafka
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z kafka 9092; do echo waiting for kafka; sleep 2; done"]
+        - name: wait-for-user-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z user-service 8081; do echo waiting for user-service; sleep 2; done"]
+        - name: wait-for-parking-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z parking-service 8083; do echo waiting for parking-service; sleep 2; done"]
+      containers:
+        - name: reservation-service
+          image: localhost:5001/smart-parking/reservation-service:local
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8086
+          env:
+            - name: APP_PORT
+              value: "8086"
+            - name: DB_NAME
+              value: reservation_service_db
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: DB_PORT
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smart-parking-app-secret
+                  key: DB_PASSWORD
+            - name: USER_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: USER_SERVICE_URL
+            - name: PARKING_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: PARKING_SERVICE_URL
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: KAFKA_BROKERS
+            - name: KAFKA_RESERVATION_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: KAFKA_RESERVATION_TOPIC
+            - name: KAFKA_PARKING_COMMAND_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: KAFKA_PARKING_COMMAND_TOPIC
+            - name: KAFKA_SPOT_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: KAFKA_SPOT_TOPIC
+            - name: KAFKA_SPOT_GROUP_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: KAFKA_SPOT_GROUP_ID_RESERVATION
+            - name: REDIS_ADDR
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: REDIS_ADDR
+            - name: REDIS_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: REDIS_PASSWORD
+            - name: REDIS_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: REDIS_DB
+            - name: REDIS_KEY_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: REDIS_RESERVATION_KEY_PREFIX
+            - name: RESERVATION_TTL_MINUTES
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: RESERVATION_TTL_MINUTES
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: OTEL_EXPORTER_OTLP_ENDPOINT
+          readinessProbe:
+            tcpSocket:
+              port: 8086
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8086
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi

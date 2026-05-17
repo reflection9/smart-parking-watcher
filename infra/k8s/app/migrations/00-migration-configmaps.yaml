@@ -1,0 +1,124 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-migrations
+  namespace: smart-parking
+data:
+  001_create_users.sql: |
+    CREATE TABLE IF NOT EXISTS users (
+        id BIGSERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        role VARCHAR(50) NOT NULL DEFAULT 'USER',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parking-service-migrations
+  namespace: smart-parking
+data:
+  001_create_zones.sql: |
+    CREATE TABLE IF NOT EXISTS zones (
+        id BIGSERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS parking_spots (
+        id BIGSERIAL PRIMARY KEY,
+        zone_id BIGINT NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+        number VARCHAR(50) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'FREE',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT uq_parking_spots_zone_number UNIQUE (zone_id, number)
+    );
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: subscription-service-migrations
+  namespace: smart-parking
+data:
+  001_create_subscriptions.sql: |
+    CREATE TABLE IF NOT EXISTS subscriptions (
+        id BIGSERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        zone_id BIGINT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT uq_subscriptions_user_zone UNIQUE (user_id, zone_id)
+    );
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: reservation-service-migrations
+  namespace: smart-parking
+data:
+  001_create_reservations.sql: |
+    CREATE TABLE IF NOT EXISTS reservations (
+        id BIGSERIAL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        zone_id BIGINT NOT NULL,
+        spot_id BIGINT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+        expires_at TIMESTAMP NOT NULL,
+        confirmed_at TIMESTAMP NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_reservations_user_id ON reservations(user_id);
+    CREATE INDEX IF NOT EXISTS idx_reservations_zone_id ON reservations(zone_id);
+    CREATE INDEX IF NOT EXISTS idx_reservations_spot_id ON reservations(spot_id);
+    CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
+    CREATE INDEX IF NOT EXISTS idx_reservations_expires_at ON reservations(expires_at);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_reservations_active_spot
+        ON reservations(zone_id, spot_id)
+        WHERE status = 'ACTIVE';
+  002_update_reservations_for_orchestration.sql: |
+    ALTER TABLE reservations
+        ALTER COLUMN status SET DEFAULT 'PENDING';
+
+    DROP INDEX IF EXISTS uq_reservations_active_spot;
+
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_reservations_pending_active_spot
+        ON reservations(zone_id, spot_id)
+        WHERE status IN ('PENDING', 'ACTIVE', 'CONFIRMING', 'CANCELLING', 'EXPIRING');
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-service-migrations
+  namespace: smart-parking
+data:
+  001_create_notifications.sql: |
+    CREATE TABLE IF NOT EXISTS notifications (
+        id BIGSERIAL PRIMARY KEY,
+        event_id VARCHAR(255) NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        user_id BIGINT NOT NULL,
+        zone_id BIGINT NOT NULL,
+        spot_id BIGINT NULL,
+        recipient_email VARCHAR(255) NOT NULL DEFAULT '',
+        subject VARCHAR(255) NOT NULL,
+        body TEXT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        error_message TEXT NULL,
+        sent_at TIMESTAMP NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT uq_notifications_event_user UNIQUE (event_id, user_id),
+        CONSTRAINT chk_notifications_status CHECK (status IN ('pending', 'sent', 'failed'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_notifications_zone_id ON notifications (zone_id);
+    CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications (user_id);
+    CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications (status);
+    CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications (created_at DESC);
