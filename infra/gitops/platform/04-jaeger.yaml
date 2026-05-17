@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jaeger
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  project: default
+  source:
+    repoURL: https://jaegertracing.github.io/helm-charts
+    chart: jaeger
+    targetRevision: 4.7.0
+    helm:
+      releaseName: jaeger
+      values: |
+        jaeger:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-role.kubernetes.io/control-plane
+                        operator: DoesNotExist
+          podAnnotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/path: /metrics
+            prometheus.io/port: "8888"
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - jaeger.localtest.me
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

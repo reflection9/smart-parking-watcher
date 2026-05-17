@@ -1,0 +1,69 @@
+name: block5-local-cicd
+
+on:
+  push:
+    branches:
+      - codex/block2-iac-gitops
+    paths-ignore:
+      - helm/smart-parking/values.yaml
+      - docs/**
+  workflow_dispatch:
+
+jobs:
+  build-push-sync:
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: self-hosted
+    defaults:
+      run:
+        shell: powershell
+    env:
+      CI_REGISTRY: spw-registry:5000
+      IMAGE_PREFIX: smart-parking
+      DOCKER_NETWORK: k3d-spw-local
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute image tag
+        run: |
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          "IMAGE_TAG=$shortSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Verify runner prerequisites
+        run: |
+          docker version
+          kubectl version --client
+          helm version
+
+      - name: Build and push service images with Kaniko
+        run: .\scripts\ci\build-push-kaniko.ps1
+
+      - name: Update Helm chart image tag
+        run: .\scripts\ci\update-helm-image-tag.ps1 -ImageTag $env:IMAGE_TAG
+
+      - name: Lint Helm chart
+        run: helm lint .\helm\smart-parking
+
+      - name: Render Helm chart
+        run: helm template smart-parking .\helm\smart-parking > $null
+
+      - name: Commit Helm value update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add helm/smart-parking/values.yaml
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "chore(ci): bump smart-parking image tag to $env:IMAGE_TAG [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          } else {
+            Write-Host "Helm values are already up to date."
+          }
+
+      - name: Ensure Argo CD app definition is applied
+        run: kubectl apply -f .\infra\gitops\apps\smart-parking-services.yaml
+
+      - name: Refresh Argo CD application
+        run: .\scripts\ci\refresh-argocd-app.ps1 -AppName smart-parking-services

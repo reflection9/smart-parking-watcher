@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smart-parking-app-config
+  labels:
+{{ include "smart-parking.labels" . | indent 4 }}
+data:
+{{- range $key, $value := .Values.appConfig }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: smart-parking-app-secret
+  labels:
+{{ include "smart-parking.labels" . | indent 4 }}
+type: Opaque
+stringData:
+{{- range $key, $value := .Values.appSecret }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
