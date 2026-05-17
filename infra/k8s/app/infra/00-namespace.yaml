@@ -3,5 +3,6 @@ kind: Namespace
 metadata:
   name: smart-parking
   labels:
+    istio-injection: enabled
     app.kubernetes.io/name: smart-parking-watcher
     app.kubernetes.io/part-of: smart-parking-watcher

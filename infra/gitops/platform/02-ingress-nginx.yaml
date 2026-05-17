@@ -7,6 +7,12 @@ metadata:
     argocd.argoproj.io/sync-wave: "30"
 spec:
   project: default
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: ingress-nginx-admission
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
   source:
     repoURL: https://kubernetes.github.io/ingress-nginx
     chart: ingress-nginx

@@ -7,6 +7,12 @@ metadata:
     argocd.argoproj.io/sync-wave: "10"
 spec:
   project: default
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: istiod-default-validator
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
   source:
     repoURL: https://istio-release.storage.googleapis.com/charts
     chart: base
