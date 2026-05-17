@@ -1,0 +1,232 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smart-parking
+  labels:
+    istio-injection: enabled
+---
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: smart-parking-strict-mtls
+  namespace: smart-parking
+spec:
+  mtls:
+    mode: STRICT
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: gateway
+  namespace: smart-parking
+spec:
+  host: gateway
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_REQUEST
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 20
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: user-service
+  namespace: smart-parking
+spec:
+  host: user-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_REQUEST
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 20
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: parking-service
+  namespace: smart-parking
+spec:
+  host: parking-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_REQUEST
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 20
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: subscription-service
+  namespace: smart-parking
+spec:
+  host: subscription-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_REQUEST
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 20
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: reservation-service
+  namespace: smart-parking
+spec:
+  host: reservation-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_REQUEST
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 20
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: history-service
+  namespace: smart-parking
+spec:
+  host: history-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_REQUEST
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 20
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: notification-service
+  namespace: smart-parking
+spec:
+  host: notification-service
+  trafficPolicy:
+    loadBalancer:
+      simple: LEAST_REQUEST
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 20
+        maxRequestsPerConnection: 10
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 5s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 100
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: user-service-read-retries
+  namespace: smart-parking
+spec:
+  hosts:
+    - user-service
+  http:
+    - match:
+        - method:
+            exact: GET
+      retries:
+        attempts: 2
+        perTryTimeout: 1s
+        retryOn: connect-failure,refused-stream,unavailable,cancelled,5xx,reset
+      timeout: 3s
+      route:
+        - destination:
+            host: user-service
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: parking-service-read-retries
+  namespace: smart-parking
+spec:
+  hosts:
+    - parking-service
+  http:
+    - match:
+        - method:
+            exact: GET
+      retries:
+        attempts: 2
+        perTryTimeout: 1s
+        retryOn: connect-failure,refused-stream,unavailable,cancelled,5xx,reset
+      timeout: 3s
+      route:
+        - destination:
+            host: parking-service
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: history-service-read-retries
+  namespace: smart-parking
+spec:
+  hosts:
+    - history-service
+  http:
+    - match:
+        - method:
+            exact: GET
+      retries:
+        attempts: 2
+        perTryTimeout: 1s
+        retryOn: connect-failure,refused-stream,unavailable,cancelled,5xx,reset
+      timeout: 3s
+      route:
+        - destination:
+            host: history-service
