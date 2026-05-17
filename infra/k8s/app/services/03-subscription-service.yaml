@@ -1,0 +1,146 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: subscription-service
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: subscription-service
+    app.kubernetes.io/component: backend
+spec:
+  ports:
+    - name: http
+      port: 8082
+      targetPort: 8082
+  selector:
+    app.kubernetes.io/name: subscription-service
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: subscription-service
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: subscription-service
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: subscription-service
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8082"
+      labels:
+        app.kubernetes.io/name: subscription-service
+        app.kubernetes.io/component: backend
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done"]
+        - name: wait-for-redis
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z redis 6379; do echo waiting for redis; sleep 2; done"]
+        - name: wait-for-user-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z user-service 8081; do echo waiting for user-service; sleep 2; done"]
+        - name: wait-for-parking-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z parking-service 8083; do echo waiting for parking-service; sleep 2; done"]
+      containers:
+        - name: subscription-service
+          image: localhost:5001/smart-parking/subscription-service:local
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8082
+          env:
+            - name: APP_PORT
+              value: "8082"
+            - name: DB_NAME
+              value: subscription_service_db
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: DB_PORT
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smart-parking-app-secret
+                  key: DB_PASSWORD
+            - name: USER_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: USER_SERVICE_URL
+            - name: PARKING_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: PARKING_SERVICE_URL
+            - name: NOTIFICATION_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: NOTIFICATION_SERVICE_URL
+            - name: REDIS_ADDR
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: REDIS_ADDR
+            - name: REDIS_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: REDIS_PASSWORD
+            - name: REDIS_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: REDIS_DB
+            - name: REDIS_KEY_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: REDIS_SUBSCRIPTION_KEY_PREFIX
+            - name: REDIS_CACHE_TTL_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: REDIS_CACHE_TTL_SECONDS
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: smart-parking-app-config
+                  key: OTEL_EXPORTER_OTLP_ENDPOINT
+          readinessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 8082
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi

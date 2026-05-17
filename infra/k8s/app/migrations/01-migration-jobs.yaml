@@ -1,0 +1,181 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: user-db-migrate
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: user-service
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: postgres:16-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          command: ["sh", "-c"]
+          args:
+            - |
+              until pg_isready -h postgres -p 5432 -U postgres -d user_service_db; do sleep 2; done
+              psql postgresql://postgres:${PGPASSWORD}@postgres:5432/user_service_db -v ON_ERROR_STOP=1 -f /migrations/001_create_users.sql
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: user-service-migrations
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parking-db-migrate
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: parking-service
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: postgres:16-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          command: ["sh", "-c"]
+          args:
+            - |
+              until pg_isready -h postgres -p 5432 -U postgres -d parking_service_db; do sleep 2; done
+              psql postgresql://postgres:${PGPASSWORD}@postgres:5432/parking_service_db -v ON_ERROR_STOP=1 -f /migrations/001_create_zones.sql
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: parking-service-migrations
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: subscription-db-migrate
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: subscription-service
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: postgres:16-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          command: ["sh", "-c"]
+          args:
+            - |
+              until pg_isready -h postgres -p 5432 -U postgres -d subscription_service_db; do sleep 2; done
+              psql postgresql://postgres:${PGPASSWORD}@postgres:5432/subscription_service_db -v ON_ERROR_STOP=1 -f /migrations/001_create_subscriptions.sql
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: subscription-service-migrations
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: reservation-db-migrate
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: reservation-service
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: postgres:16-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          command: ["sh", "-c"]
+          args:
+            - |
+              until pg_isready -h postgres -p 5432 -U postgres -d reservation_service_db; do sleep 2; done
+              for file in /migrations/*.sql; do
+                psql postgresql://postgres:${PGPASSWORD}@postgres:5432/reservation_service_db -v ON_ERROR_STOP=1 -f ${file}
+              done
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: reservation-service-migrations
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: notification-db-migrate
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/component: migration
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: postgres:16-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          command: ["sh", "-c"]
+          args:
+            - |
+              until pg_isready -h postgres -p 5432 -U postgres -d notification_service_db; do sleep 2; done
+              psql postgresql://postgres:${PGPASSWORD}@postgres:5432/notification_service_db -v ON_ERROR_STOP=1 -f /migrations/001_create_notifications.sql
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: notification-service-migrations

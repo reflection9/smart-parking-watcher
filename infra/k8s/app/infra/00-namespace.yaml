@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smart-parking
+  labels:
+    app.kubernetes.io/name: smart-parking-watcher
+    app.kubernetes.io/part-of: smart-parking-watcher

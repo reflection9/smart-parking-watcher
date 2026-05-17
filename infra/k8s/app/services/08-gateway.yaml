@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/component: edge
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app.kubernetes.io/name: gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: smart-parking
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/component: edge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway
+        app.kubernetes.io/component: edge
+    spec:
+      initContainers:
+        - name: wait-for-user-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z user-service 8081; do echo waiting for user-service; sleep 2; done"]
+        - name: wait-for-parking-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z parking-service 8083; do echo waiting for parking-service; sleep 2; done"]
+        - name: wait-for-subscription-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z subscription-service 8082; do echo waiting for subscription-service; sleep 2; done"]
+        - name: wait-for-reservation-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z reservation-service 8086; do echo waiting for reservation-service; sleep 2; done"]
+        - name: wait-for-history-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z history-service 8084; do echo waiting for history-service; sleep 2; done"]
+        - name: wait-for-notification-service
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z notification-service 8085; do echo waiting for notification-service; sleep 2; done"]
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+            - name: gateway-nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: gateway-nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+      volumes:
+        - name: gateway-nginx-config
+          configMap:
+            name: gateway-nginx-config

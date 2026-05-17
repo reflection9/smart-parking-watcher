@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smart-parking-app-config
+  namespace: smart-parking
+data:
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: postgres
+  USER_SERVICE_URL: http://user-service:8081
+  PARKING_SERVICE_URL: http://parking-service:8083
+  SUBSCRIPTION_SERVICE_URL: http://subscription-service:8082
+  NOTIFICATION_SERVICE_URL: http://notification-service:8085
+  KAFKA_BROKERS: kafka:9092
+  KAFKA_RESERVATION_TOPIC: reservation-lifecycle-events
+  KAFKA_PARKING_COMMAND_TOPIC: parking-spot-commands
+  KAFKA_SPOT_TOPIC: spot-status-events
+  KAFKA_PARKING_COMMAND_GROUP_ID: parking-service-commands
+  KAFKA_SPOT_GROUP_ID_RESERVATION: reservation-service-spots
+  KAFKA_RESERVATION_GROUP_ID_HISTORY: history-service-reservations
+  KAFKA_SPOT_GROUP_ID_HISTORY: history-service-spots
+  KAFKA_GROUP_ID_NOTIFICATION: notification-service-spots
+  REDIS_ADDR: redis:6379
+  REDIS_PASSWORD: ""
+  REDIS_DB: "0"
+  RESERVATION_TTL_MINUTES: "5"
+  REDIS_RESERVATION_KEY_PREFIX: "reservation:ttl:"
+  REDIS_SUBSCRIPTION_KEY_PREFIX: "subscription_cache:"
+  REDIS_CACHE_TTL_SECONDS: "60"
+  MONGO_URI: "mongodb://mongo:27017"
+  MONGO_DB_NAME: history_service_db
+  MONGO_COLLECTION: parking_events
+  MINIO_ENDPOINT: "minio:9000"
+  MINIO_BUCKET: history-archives
+  MINIO_USE_SSL: "false"
+  ARCHIVE_AFTER_HOURS: "720"
+  ARCHIVE_INTERVAL_SECONDS: "300"
+  ARCHIVE_BATCH_SIZE: "500"
+  EMAIL_TRANSPORT: log
+  EMAIL_FROM: noreply@smartparking.local
+  SMTP_HOST: localhost
+  SMTP_PORT: "587"
+  OTEL_EXPORTER_OTLP_ENDPOINT: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: smart-parking-app-secret
+  namespace: smart-parking
+type: Opaque
+stringData:
+  DB_PASSWORD: postgres
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  SMTP_USERNAME: ""
+  SMTP_PASSWORD: ""
