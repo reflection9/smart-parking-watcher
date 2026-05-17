@@ -33,3 +33,10 @@ coverage.out
 # Temp
 tmp/
 temp/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*tfplan
+infra/terraform/bootstrap/terraform.tfvars

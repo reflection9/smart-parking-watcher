@@ -1,0 +1,60 @@
+---
+- name: Ensure Kafka namespace exists
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ kafka_namespace }}"
+
+- name: Install Strimzi operator
+  kubernetes.core.k8s:
+    state: present
+    src: "{{ strimzi_operator_install_url }}"
+    namespace: "{{ kafka_namespace }}"
+
+- name: Wait for Strimzi Cluster Operator deployment
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ kafka_namespace }}"
+    name: strimzi-cluster-operator
+  register: strimzi_operator
+  retries: 30
+  delay: 10
+  until:
+    - strimzi_operator.resources | length > 0
+    - (strimzi_operator.resources[0].status.availableReplicas | default(0) | int) >= 1
+
+- name: Render Kafka custom resources
+  ansible.builtin.template:
+    src: kafka-cluster.yaml.j2
+    dest: "/tmp/{{ kafka_cluster_name }}-strimzi-kafka.yaml"
+    mode: "0644"
+
+- name: Apply Kafka custom resources
+  kubernetes.core.k8s:
+    state: present
+    namespace: "{{ kafka_namespace }}"
+    src: "/tmp/{{ kafka_cluster_name }}-strimzi-kafka.yaml"
+
+- name: Wait for Kafka custom resource to become ready
+  kubernetes.core.k8s_info:
+    api_version: kafka.strimzi.io/v1
+    kind: Kafka
+    namespace: "{{ kafka_namespace }}"
+    name: "{{ kafka_cluster_name }}"
+  register: kafka_cr
+  retries: 36
+  delay: 10
+  until:
+    - kafka_cr.resources | length > 0
+    - >
+      (
+        kafka_cr.resources[0].status.conditions | default([])
+        | selectattr('type', 'equalto', 'Ready')
+        | selectattr('status', 'equalto', 'True')
+        | list
+        | length
+      ) > 0

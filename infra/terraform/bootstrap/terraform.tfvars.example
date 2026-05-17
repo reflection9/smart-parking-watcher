@@ -1,0 +1,9 @@
+kubeconfig_path = "~/.kube/config"
+
+app_secret_data = {
+  DB_PASSWORD      = "change-me"
+  MINIO_ACCESS_KEY = "change-me"
+  MINIO_SECRET_KEY = "change-me"
+  SMTP_USERNAME    = ""
+  SMTP_PASSWORD    = ""
+}

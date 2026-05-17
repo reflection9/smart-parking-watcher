@@ -23,12 +23,15 @@ metadata:
     app.kubernetes.io/name: gateway
     app.kubernetes.io/component: edge
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: gateway
   template:
     metadata:
+      annotations:
+        sidecar.istio.io/inject: "true"
+        proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
       labels:
         app.kubernetes.io/name: gateway
         app.kubernetes.io/component: edge

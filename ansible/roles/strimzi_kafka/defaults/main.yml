@@ -1,0 +1,14 @@
+---
+kafka_namespace: kafka
+strimzi_operator_install_url: "https://strimzi.io/install/latest?namespace={{ kafka_namespace }}"
+
+kafka_cluster_name: smart-parking
+kafka_version: 4.2.0
+kafka_replicas: 1
+kafka_storage_size: 5Gi
+kafka_storage_class: ""
+kafka_metadata_version: 4.2-IV0
+
+kafka_plain_listener_name: plain
+kafka_plain_listener_port: 9092
+kafka_plain_listener_tls: false
