@@ -11,8 +11,8 @@ spec:
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
       name: istiod-default-validator
-      jqPathExpressions:
-        - .webhooks[]?.clientConfig.caBundle
+      jsonPointers:
+        - /webhooks
   source:
     repoURL: https://istio-release.storage.googleapis.com/charts
     chart: base

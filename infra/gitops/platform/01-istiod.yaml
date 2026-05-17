@@ -11,13 +11,13 @@ spec:
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration
       name: istio-sidecar-injector
-      jqPathExpressions:
-        - .webhooks[]?.clientConfig.caBundle
+      jsonPointers:
+        - /webhooks
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
       name: istio-validator-istio-system
-      jqPathExpressions:
-        - .webhooks[]?.clientConfig.caBundle
+      jsonPointers:
+        - /webhooks
   source:
     repoURL: https://istio-release.storage.googleapis.com/charts
     chart: istiod
