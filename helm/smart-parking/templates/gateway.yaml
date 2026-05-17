@@ -1,0 +1,83 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.gateway.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.gateway.name }}
+    app.kubernetes.io/component: {{ .Values.gateway.component }}
+{{ include "smart-parking.labels" . | indent 4 }}
+spec:
+  ports:
+    - name: http
+      port: {{ .Values.gateway.port }}
+      targetPort: {{ .Values.gateway.port }}
+  selector:
+    app.kubernetes.io/name: {{ .Values.gateway.name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.gateway.name }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.gateway.name }}
+    app.kubernetes.io/component: {{ .Values.gateway.component }}
+{{ include "smart-parking.labels" . | indent 4 }}
+spec:
+  replicas: {{ .Values.gateway.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.gateway.name }}
+  template:
+    metadata:
+      annotations:
+{{- if .Values.global.istio.inject }}
+        sidecar.istio.io/inject: "true"
+{{- end }}
+{{- if .Values.global.istio.holdApplicationUntilProxyStarts }}
+        proxy.istio.io/config: '{ "holdApplicationUntilProxyStarts": true }'
+{{- end }}
+      labels:
+        app.kubernetes.io/name: {{ .Values.gateway.name }}
+        app.kubernetes.io/component: {{ .Values.gateway.component }}
+    spec:
+      initContainers:
+{{- range $wait := .Values.gateway.initWaitFor }}
+        - name: {{ $wait.name }}
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z {{ $wait.host }} {{ $wait.port }}; do echo waiting for {{ $wait.host }}; sleep 2; done"]
+{{- end }}
+      containers:
+        - name: nginx
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.port }}
+          volumeMounts:
+            - name: gateway-nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: gateway-nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.gateway.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.gateway.port }}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+{{ toYaml .Values.gateway.resources | indent 12 }}
+      volumes:
+        - name: gateway-nginx-config
+          configMap:
+            name: gateway-nginx-config

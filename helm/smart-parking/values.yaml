@@ -1,0 +1,410 @@
+global:
+  image:
+    registry: spw-registry:5000
+    repositoryPrefix: smart-parking
+    tag: local
+    pullPolicy: Always
+  istio:
+    inject: true
+    holdApplicationUntilProxyStarts: true
+
+appConfig:
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: postgres
+  USER_SERVICE_URL: http://user-service:8081
+  PARKING_SERVICE_URL: http://parking-service:8083
+  SUBSCRIPTION_SERVICE_URL: http://subscription-service:8082
+  NOTIFICATION_SERVICE_URL: http://notification-service:8085
+  KAFKA_BROKERS: kafka:9092
+  KAFKA_RESERVATION_TOPIC: reservation-lifecycle-events
+  KAFKA_PARKING_COMMAND_TOPIC: parking-spot-commands
+  KAFKA_SPOT_TOPIC: spot-status-events
+  KAFKA_PARKING_COMMAND_GROUP_ID: parking-service-commands
+  KAFKA_SPOT_GROUP_ID_RESERVATION: reservation-service-spots
+  KAFKA_RESERVATION_GROUP_ID_HISTORY: history-service-reservations
+  KAFKA_SPOT_GROUP_ID_HISTORY: history-service-spots
+  KAFKA_GROUP_ID_NOTIFICATION: notification-service-spots
+  REDIS_ADDR: redis:6379
+  REDIS_PASSWORD: ""
+  REDIS_DB: "0"
+  RESERVATION_TTL_MINUTES: "5"
+  REDIS_RESERVATION_KEY_PREFIX: "reservation:ttl:"
+  REDIS_SUBSCRIPTION_KEY_PREFIX: "subscription_cache:"
+  REDIS_CACHE_TTL_SECONDS: "60"
+  MONGO_URI: mongodb://mongo:27017
+  MONGO_DB_NAME: history_service_db
+  MONGO_COLLECTION: parking_events
+  MINIO_ENDPOINT: minio:9000
+  MINIO_BUCKET: history-archives
+  MINIO_USE_SSL: "false"
+  ARCHIVE_AFTER_HOURS: "720"
+  ARCHIVE_INTERVAL_SECONDS: "300"
+  ARCHIVE_BATCH_SIZE: "500"
+  EMAIL_TRANSPORT: log
+  EMAIL_FROM: noreply@smartparking.local
+  SMTP_HOST: localhost
+  SMTP_PORT: "587"
+  OTEL_EXPORTER_OTLP_ENDPOINT: jaeger.observability.svc.cluster.local:4318
+
+appSecret:
+  DB_PASSWORD: postgres
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  SMTP_USERNAME: ""
+  SMTP_PASSWORD: ""
+
+services:
+  - name: user-service
+    component: backend
+    imageName: user-service
+    port: 8081
+    replicas: 1
+    initWaitFor:
+      - name: wait-for-postgres
+        host: postgres
+        port: 5432
+    env:
+      - name: APP_PORT
+        value: "8081"
+      - name: DB_NAME
+        value: user_service_db
+      - name: DB_HOST
+        configMapKeyRef: DB_HOST
+      - name: DB_PORT
+        configMapKeyRef: DB_PORT
+      - name: DB_USER
+        configMapKeyRef: DB_USER
+      - name: DB_PASSWORD
+        secretKeyRef: DB_PASSWORD
+      - name: OTEL_EXPORTER_OTLP_ENDPOINT
+        configMapKeyRef: OTEL_EXPORTER_OTLP_ENDPOINT
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  - name: parking-service
+    component: backend
+    imageName: parking-service
+    port: 8083
+    replicas: 1
+    initWaitFor:
+      - name: wait-for-postgres
+        host: postgres
+        port: 5432
+      - name: wait-for-kafka
+        host: kafka
+        port: 9092
+    env:
+      - name: APP_PORT
+        value: "8083"
+      - name: DB_NAME
+        value: parking_service_db
+      - name: DB_HOST
+        configMapKeyRef: DB_HOST
+      - name: DB_PORT
+        configMapKeyRef: DB_PORT
+      - name: DB_USER
+        configMapKeyRef: DB_USER
+      - name: DB_PASSWORD
+        secretKeyRef: DB_PASSWORD
+      - name: KAFKA_BROKERS
+        configMapKeyRef: KAFKA_BROKERS
+      - name: KAFKA_SPOT_TOPIC
+        configMapKeyRef: KAFKA_SPOT_TOPIC
+      - name: KAFKA_PARKING_COMMAND_TOPIC
+        configMapKeyRef: KAFKA_PARKING_COMMAND_TOPIC
+      - name: KAFKA_PARKING_COMMAND_GROUP_ID
+        configMapKeyRef: KAFKA_PARKING_COMMAND_GROUP_ID
+      - name: OTEL_EXPORTER_OTLP_ENDPOINT
+        configMapKeyRef: OTEL_EXPORTER_OTLP_ENDPOINT
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  - name: subscription-service
+    component: backend
+    imageName: subscription-service
+    port: 8082
+    replicas: 1
+    initWaitFor:
+      - name: wait-for-postgres
+        host: postgres
+        port: 5432
+      - name: wait-for-redis
+        host: redis
+        port: 6379
+      - name: wait-for-user-service
+        host: user-service
+        port: 8081
+      - name: wait-for-parking-service
+        host: parking-service
+        port: 8083
+    env:
+      - name: APP_PORT
+        value: "8082"
+      - name: DB_NAME
+        value: subscription_service_db
+      - name: DB_HOST
+        configMapKeyRef: DB_HOST
+      - name: DB_PORT
+        configMapKeyRef: DB_PORT
+      - name: DB_USER
+        configMapKeyRef: DB_USER
+      - name: DB_PASSWORD
+        secretKeyRef: DB_PASSWORD
+      - name: USER_SERVICE_URL
+        configMapKeyRef: USER_SERVICE_URL
+      - name: PARKING_SERVICE_URL
+        configMapKeyRef: PARKING_SERVICE_URL
+      - name: NOTIFICATION_SERVICE_URL
+        configMapKeyRef: NOTIFICATION_SERVICE_URL
+      - name: REDIS_ADDR
+        configMapKeyRef: REDIS_ADDR
+      - name: REDIS_PASSWORD
+        configMapKeyRef: REDIS_PASSWORD
+      - name: REDIS_DB
+        configMapKeyRef: REDIS_DB
+      - name: REDIS_KEY_PREFIX
+        configMapKeyRef: REDIS_SUBSCRIPTION_KEY_PREFIX
+      - name: REDIS_CACHE_TTL_SECONDS
+        configMapKeyRef: REDIS_CACHE_TTL_SECONDS
+      - name: OTEL_EXPORTER_OTLP_ENDPOINT
+        configMapKeyRef: OTEL_EXPORTER_OTLP_ENDPOINT
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  - name: reservation-service
+    component: backend
+    imageName: reservation-service
+    port: 8086
+    replicas: 1
+    initWaitFor:
+      - name: wait-for-postgres
+        host: postgres
+        port: 5432
+      - name: wait-for-redis
+        host: redis
+        port: 6379
+      - name: wait-for-kafka
+        host: kafka
+        port: 9092
+      - name: wait-for-user-service
+        host: user-service
+        port: 8081
+      - name: wait-for-parking-service
+        host: parking-service
+        port: 8083
+    env:
+      - name: APP_PORT
+        value: "8086"
+      - name: DB_NAME
+        value: reservation_service_db
+      - name: DB_HOST
+        configMapKeyRef: DB_HOST
+      - name: DB_PORT
+        configMapKeyRef: DB_PORT
+      - name: DB_USER
+        configMapKeyRef: DB_USER
+      - name: DB_PASSWORD
+        secretKeyRef: DB_PASSWORD
+      - name: USER_SERVICE_URL
+        configMapKeyRef: USER_SERVICE_URL
+      - name: PARKING_SERVICE_URL
+        configMapKeyRef: PARKING_SERVICE_URL
+      - name: KAFKA_BROKERS
+        configMapKeyRef: KAFKA_BROKERS
+      - name: KAFKA_RESERVATION_TOPIC
+        configMapKeyRef: KAFKA_RESERVATION_TOPIC
+      - name: KAFKA_PARKING_COMMAND_TOPIC
+        configMapKeyRef: KAFKA_PARKING_COMMAND_TOPIC
+      - name: KAFKA_SPOT_TOPIC
+        configMapKeyRef: KAFKA_SPOT_TOPIC
+      - name: KAFKA_SPOT_GROUP_ID
+        configMapKeyRef: KAFKA_SPOT_GROUP_ID_RESERVATION
+      - name: REDIS_ADDR
+        configMapKeyRef: REDIS_ADDR
+      - name: REDIS_PASSWORD
+        configMapKeyRef: REDIS_PASSWORD
+      - name: REDIS_DB
+        configMapKeyRef: REDIS_DB
+      - name: REDIS_KEY_PREFIX
+        configMapKeyRef: REDIS_RESERVATION_KEY_PREFIX
+      - name: RESERVATION_TTL_MINUTES
+        configMapKeyRef: RESERVATION_TTL_MINUTES
+      - name: OTEL_EXPORTER_OTLP_ENDPOINT
+        configMapKeyRef: OTEL_EXPORTER_OTLP_ENDPOINT
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  - name: history-service
+    component: backend
+    imageName: history-service
+    port: 8084
+    replicas: 1
+    initWaitFor:
+      - name: wait-for-mongo
+        host: mongo
+        port: 27017
+      - name: wait-for-kafka
+        host: kafka
+        port: 9092
+      - name: wait-for-minio
+        host: minio
+        port: 9000
+    env:
+      - name: APP_PORT
+        value: "8084"
+      - name: MONGO_URI
+        configMapKeyRef: MONGO_URI
+      - name: MONGO_DB_NAME
+        configMapKeyRef: MONGO_DB_NAME
+      - name: MONGO_COLLECTION
+        configMapKeyRef: MONGO_COLLECTION
+      - name: KAFKA_BROKERS
+        configMapKeyRef: KAFKA_BROKERS
+      - name: KAFKA_RESERVATION_TOPIC
+        configMapKeyRef: KAFKA_RESERVATION_TOPIC
+      - name: KAFKA_RESERVATION_GROUP_ID
+        configMapKeyRef: KAFKA_RESERVATION_GROUP_ID_HISTORY
+      - name: KAFKA_SPOT_TOPIC
+        configMapKeyRef: KAFKA_SPOT_TOPIC
+      - name: KAFKA_SPOT_GROUP_ID
+        configMapKeyRef: KAFKA_SPOT_GROUP_ID_HISTORY
+      - name: MINIO_ENDPOINT
+        configMapKeyRef: MINIO_ENDPOINT
+      - name: MINIO_ACCESS_KEY
+        secretKeyRef: MINIO_ACCESS_KEY
+      - name: MINIO_SECRET_KEY
+        secretKeyRef: MINIO_SECRET_KEY
+      - name: MINIO_BUCKET
+        configMapKeyRef: MINIO_BUCKET
+      - name: MINIO_USE_SSL
+        configMapKeyRef: MINIO_USE_SSL
+      - name: ARCHIVE_AFTER_HOURS
+        configMapKeyRef: ARCHIVE_AFTER_HOURS
+      - name: ARCHIVE_INTERVAL_SECONDS
+        configMapKeyRef: ARCHIVE_INTERVAL_SECONDS
+      - name: ARCHIVE_BATCH_SIZE
+        configMapKeyRef: ARCHIVE_BATCH_SIZE
+      - name: OTEL_EXPORTER_OTLP_ENDPOINT
+        configMapKeyRef: OTEL_EXPORTER_OTLP_ENDPOINT
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+  - name: notification-service
+    component: backend
+    imageName: notification-service
+    port: 8085
+    replicas: 1
+    initWaitFor:
+      - name: wait-for-postgres
+        host: postgres
+        port: 5432
+      - name: wait-for-kafka
+        host: kafka
+        port: 9092
+      - name: wait-for-user-service
+        host: user-service
+        port: 8081
+      - name: wait-for-subscription-service
+        host: subscription-service
+        port: 8082
+    env:
+      - name: APP_PORT
+        value: "8085"
+      - name: DB_NAME
+        value: notification_service_db
+      - name: DB_HOST
+        configMapKeyRef: DB_HOST
+      - name: DB_PORT
+        configMapKeyRef: DB_PORT
+      - name: DB_USER
+        configMapKeyRef: DB_USER
+      - name: DB_PASSWORD
+        secretKeyRef: DB_PASSWORD
+      - name: SUBSCRIPTION_SERVICE_URL
+        configMapKeyRef: SUBSCRIPTION_SERVICE_URL
+      - name: USER_SERVICE_URL
+        configMapKeyRef: USER_SERVICE_URL
+      - name: EMAIL_TRANSPORT
+        configMapKeyRef: EMAIL_TRANSPORT
+      - name: EMAIL_FROM
+        configMapKeyRef: EMAIL_FROM
+      - name: SMTP_HOST
+        configMapKeyRef: SMTP_HOST
+      - name: SMTP_PORT
+        configMapKeyRef: SMTP_PORT
+      - name: SMTP_USERNAME
+        secretKeyRef: SMTP_USERNAME
+      - name: SMTP_PASSWORD
+        secretKeyRef: SMTP_PASSWORD
+      - name: KAFKA_BROKERS
+        configMapKeyRef: KAFKA_BROKERS
+      - name: KAFKA_SPOT_TOPIC
+        configMapKeyRef: KAFKA_SPOT_TOPIC
+      - name: KAFKA_GROUP_ID
+        configMapKeyRef: KAFKA_GROUP_ID_NOTIFICATION
+      - name: OTEL_EXPORTER_OTLP_ENDPOINT
+        configMapKeyRef: OTEL_EXPORTER_OTLP_ENDPOINT
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+
+gateway:
+  name: gateway
+  replicas: 2
+  image:
+    repository: nginx
+    tag: 1.27-alpine
+    pullPolicy: IfNotPresent
+  port: 8080
+  component: edge
+  initWaitFor:
+    - name: wait-for-user-service
+      host: user-service
+      port: 8081
+    - name: wait-for-parking-service
+      host: parking-service
+      port: 8083
+    - name: wait-for-subscription-service
+      host: subscription-service
+      port: 8082
+    - name: wait-for-reservation-service
+      host: reservation-service
+      port: 8086
+    - name: wait-for-history-service
+      host: history-service
+      port: 8084
+    - name: wait-for-notification-service
+      host: notification-service
+      port: 8085
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

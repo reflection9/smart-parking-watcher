@@ -10,9 +10,9 @@ spec:
   source:
     repoURL: https://github.com/reflection9/smart-parking-watcher.git
     targetRevision: codex/block2-iac-gitops
-    path: infra/k8s/app/services
-    directory:
-      recurse: true
+    path: helm/smart-parking
+    helm:
+      releaseName: smart-parking
   destination:
     server: https://kubernetes.default.svc
     namespace: smart-parking

@@ -1,0 +1,176 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-nginx-config
+  labels:
+{{ include "smart-parking.labels" . | indent 4 }}
+data:
+  nginx.conf: |
+    worker_processes auto;
+
+    events {
+        worker_connections 1024;
+    }
+
+    http {
+        include       /etc/nginx/mime.types;
+        default_type  application/octet-stream;
+
+        sendfile        on;
+        tcp_nopush      on;
+        keepalive_timeout 65;
+        server_tokens off;
+
+        log_format gateway '$remote_addr - $remote_user [$time_local] "$request" '
+                          '$status $body_bytes_sent "$http_referer" '
+                          '"$http_user_agent" "$http_x_forwarded_for"';
+
+        access_log /dev/stdout gateway;
+        error_log  /dev/stderr warn;
+
+        limit_req_status 429;
+
+        upstream user_service {
+            least_conn;
+            server user-service:8081;
+            keepalive 16;
+        }
+
+        upstream parking_service {
+            least_conn;
+            server parking-service:8083;
+            keepalive 16;
+        }
+
+        upstream subscription_service {
+            least_conn;
+            server subscription-service:8082;
+            keepalive 16;
+        }
+
+        upstream reservation_service {
+            least_conn;
+            server reservation-service:8086;
+            keepalive 16;
+        }
+
+        upstream history_service {
+            least_conn;
+            server history-service:8084;
+            keepalive 16;
+        }
+
+        upstream notification_service {
+            least_conn;
+            server notification-service:8085;
+            keepalive 16;
+        }
+
+        limit_req_zone $binary_remote_addr zone=register_limit:10m rate=5r/m;
+        limit_req_zone $binary_remote_addr zone=login_limit:10m rate=10r/m;
+        limit_req_zone $binary_remote_addr zone=subscription_limit:10m rate=20r/m;
+        limit_req_zone $binary_remote_addr zone=reservation_limit:10m rate=15r/m;
+        limit_req_zone $binary_remote_addr zone=archive_limit:10m rate=2r/m;
+
+        include /etc/nginx/conf.d/*.conf;
+    }
+  default.conf: |
+    server {
+        listen 8080;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 60s;
+
+        location = /health {
+            access_log off;
+            add_header Content-Type text/plain;
+            return 200 "gateway ok\n";
+        }
+
+        location = /users/register {
+            limit_req zone=register_limit burst=5 nodelay;
+            proxy_pass http://user_service;
+        }
+
+        location = /users/login {
+            limit_req zone=login_limit burst=10 nodelay;
+            proxy_pass http://user_service;
+        }
+
+        location /users/ {
+            proxy_pass http://user_service;
+        }
+
+        location = /subscriptions {
+            limit_req zone=subscription_limit burst=10 nodelay;
+            proxy_pass http://subscription_service;
+        }
+
+        location /subscriptions/ {
+            proxy_pass http://subscription_service;
+        }
+
+        location = /reservations {
+            limit_req zone=reservation_limit burst=10 nodelay;
+            proxy_pass http://reservation_service;
+        }
+
+        location ~ ^/reservations/[^/]+/(confirm|cancel|expire)$ {
+            limit_req zone=reservation_limit burst=10 nodelay;
+            proxy_pass http://reservation_service;
+        }
+
+        location /reservations/ {
+            proxy_pass http://reservation_service;
+        }
+
+        location = /history/archive {
+            limit_req zone=archive_limit burst=2 nodelay;
+            proxy_pass http://history_service;
+        }
+
+        location = /events {
+            proxy_pass http://history_service;
+        }
+
+        location /history/ {
+            proxy_pass http://history_service;
+        }
+
+        location /events/ {
+            proxy_pass http://history_service;
+        }
+
+        location = /zones {
+            proxy_pass http://parking_service;
+        }
+
+        location /zones/ {
+            proxy_pass http://parking_service;
+        }
+
+        location /spots/ {
+            proxy_pass http://parking_service;
+        }
+
+        location = /notifications {
+            proxy_pass http://notification_service;
+        }
+
+        location /notifications/ {
+            proxy_pass http://notification_service;
+        }
+
+        location / {
+            return 200 "SmartParkingWatcher gateway\n";
+        }
+    }

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: smart-parking
+description: Helm chart for Smart Parking Watcher application services and gateway
+type: application
+version: 0.1.0
+appVersion: "local"
