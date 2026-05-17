@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: smart-parking-observability
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "50"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/reflection9/smart-parking-watcher.git
+    targetRevision: codex/block2-iac-gitops
+    path: infra/k8s/platform/observability
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
